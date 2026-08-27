@@ -134,6 +134,37 @@ perpetual plan diff.
 
 Found by review of Task 4. Not previously tracked.
 
+### Finding ⑲ — Branch protection is unavailable on the current GitHub plan
+
+Finding ⑫ cannot be closed as written. Verified against the API on all four repositories:
+
+```
+POST repos/Beyric/plateng-gitops/rulesets
+403 — "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+
+Branch protection **and** the newer rulesets both require GitHub Pro, Team or Enterprise on
+**private** repositories. All four repositories here are private on a free plan.
+
+This matters more than it would on an ordinary codebase: `plateng-gitops` **is** production.
+Anything pushed to its `main` is reconciled into a live cluster by Argo CD. Without protection,
+a direct push to `main` is a deployment — with no review, no CI gate, and no second pair of eyes.
+
+`CODEOWNERS` has been added to both platform repos. It is **advisory only** until protection
+exists — it auto-requests review on a PR but enforces nothing.
+
+**Options, for Adebayo to decide:**
+
+| Option | Cost | Assessment |
+|---|---|---|
+| **GitHub Pro** | **$4/mo** | Branch protection and rulesets on private repos. Against a $250 infrastructure budget this is noise. **Recommended.** |
+| Make platform repos public | free | No secrets are present (verified). But it publishes the AWS account id, VPC CIDRs and full architecture — free reconnaissance. Not recommended for infrastructure repos. |
+| Local enforcement only | free | pre-commit hooks and discipline. Anyone with push access can still deploy to production by pushing to `main`. |
+| Self-host Forgejo | free + a VM | Full control, and already on the stack list. A real detour, and it adds a component to run and back up. |
+
+**Blocks:** nothing immediately — but it must be resolved before Phase 2 wires Argo CD to
+`plateng-gitops`, because from that moment a push to `main` is a production deployment.
+
 ### Triaged as NOT exposures
 
 Checking these was the point of triage; scanning without it produces noise that gets ignored.
