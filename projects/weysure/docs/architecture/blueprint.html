@@ -658,17 +658,17 @@ flowchart TB
     <div class="phases">
       <div class="ph"><span class="ph-n">00</span><span class="ph-t">Foundations &amp; guardrails</span><span class="ph-d">Repos governed, secrets purged, Gitleaks active, SSO live, static keys deleted. <strong>$0 spent.</strong></span></div>
       <div class="ph"><span class="ph-n">01</span><span class="ph-t">Network &amp; cluster</span><span class="ph-d">VPC, EKS 1.31, add-ons, IRSA, access entries, Karpenter provisioning and consolidating.</span></div>
-      <div class="ph"><span class="ph-n">02</span><span class="ph-t">Cluster baseline</span><span class="ph-d">Storage, Cloudflare delegation, Traefik, cert-manager, external-dns. A real HTTPS URL serves traffic.</span></div>
-      <div class="ph"><span class="ph-n">03</span><span class="ph-t">Data layer</span><span class="ph-d">RDS with managed master password, migration rehearsed and cut over, Redis, restore drill timed.</span></div>
-      <div class="ph"><span class="ph-n">04</span><span class="ph-t">Secrets</span><span class="ph-d">Vault initialised, policies, database engine issuing 1-hour credentials, ESO syncing, Reloader verified.</span></div>
-      <div class="ph"><span class="ph-n">05</span><span class="ph-t">GitOps</span><span class="ph-d">Argo CD self-managing, app-of-apps reconciling, drift alerting, git-revert rollback demonstrated.</span></div>
+      <div class="ph"><span class="ph-n">02</span><span class="ph-t">GitOps bootstrap</span><span class="ph-d">Storage, metrics-server, Argo CD installed once by hand and thereafter self-managing. The cluster stops being something you talk to directly.</span></div>
+      <div class="ph"><span class="ph-n">03</span><span class="ph-t">Secrets</span><span class="ph-d">Vault with KMS auto-unseal, ESO, Reloader. Deployed by Argo CD; needs no ingress, so it comes first.</span></div>
+      <div class="ph"><span class="ph-n">04</span><span class="ph-t">Ingress &amp; TLS</span><span class="ph-d">Cloudflare delegation, Traefik, cert-manager, external-dns — with the Cloudflare token read from Vault, not hand-created.</span></div>
+      <div class="ph"><span class="ph-n">05</span><span class="ph-t">Data layer</span><span class="ph-d">RDS with managed master password, migration rehearsed and cut over, Redis, Vault database engine, restore drill timed.</span></div>
       <div class="ph"><span class="ph-n">06</span><span class="ph-t">Continuous integration</span><span class="ph-d">Jenkins on ephemeral agents, SonarQube, Gitleaks, Trivy gating. No cluster credentials anywhere.</span></div>
       <div class="ph"><span class="ph-n">07</span><span class="ph-t">Application delivery</span><span class="ph-d">Helm charts, probes, HPA, PDB. Migrations move to a PreSync hook, out of container start.</span></div>
       <div class="ph"><span class="ph-n">08</span><span class="ph-t">Policy</span><span class="ph-d">Kyverno in audit before enforce, default-deny NetworkPolicies, quotas per namespace.</span></div>
       <div class="ph"><span class="ph-n">09</span><span class="ph-t">Observability</span><span class="ph-d">Prometheus, Grafana, Alertmanager, Blackbox. Alerts tested by inducing real failures.</span></div>
       <div class="ph"><span class="ph-n">10</span><span class="ph-t">Production readiness</span><span class="ph-d">DR drill, SLOs, load test, cost review. Reliability gaps revisited with operational experience behind them.</span></div>
     </div>
-    <p class="plate-note">Two orderings are deliberate and counter-intuitive. <strong>Secrets before GitOps:</strong> if Argo CD arrives first, a Kubernetes Secret gets committed to git to make something work, and it stays there. <strong>GitOps before CI:</strong> built first, Jenkins grows <code>kubectl</code> calls — exactly as the existing pipeline did.</p>
+    <p class="plate-note">Two orderings are deliberate and counter-intuitive. <strong>GitOps before Secrets:</strong> Argo CD lands right after the cluster so Vault itself is installed <em>by</em> Argo CD rather than adopted later — if Argo CD arrived after Vault, a Kubernetes Secret would get committed to git to make something work, and it would stay there. <strong>GitOps before CI:</strong> built first, Jenkins grows <code>kubectl</code> calls — exactly as the existing pipeline did.</p>
   </section>
 
   <section id="wa">
