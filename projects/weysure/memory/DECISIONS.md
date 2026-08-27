@@ -30,8 +30,11 @@ local `users` table, JWTs signed with the application's own `SECRET_KEY`.
 **Consequences.** Full AWS ownership; enables Vault dynamic database credentials, which
 Supabase cannot provide.
 
-> **Amended 2026-08-27 — the Supabase database is empty.** Confirmed with Adebayo: there is no
-> data to move and nothing outside the system has acted on any row. This collapses the
+> **Amended 2026-08-27 — the Supabase database is empty / throwaway.** Confirmed with Adebayo
+> against the question that actually matters: not "is this data valuable?" but "has anything
+> outside this database already acted on a row?" Nothing has — no Paystack transaction
+> reference in their ledger, no acknowledged webhook, no email a real person received. So there
+> is nothing to preserve and no external record to reconcile against. This collapses the
 > "migration" into a provisioning step: create RDS, run `alembic upgrade head` (47 revisions),
 > point `DATABASE_URL` at it. No `pg_dump`, no `pg_restore`, no checksum verification, no
 > maintenance window, no dual-running, no rollback window.
