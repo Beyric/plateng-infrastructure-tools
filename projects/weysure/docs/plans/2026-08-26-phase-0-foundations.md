@@ -341,7 +341,19 @@ Expected: all three report `ABSENT`.
 - [ ] **Step 2: Install them**
 
 ```bash
-brew install gitleaks pre-commit tflint
+brew install gitleaks pre-commit
+```
+
+**`tflint` is no longer distributed via Homebrew** — the formula and its tap were both removed
+upstream. Install from a checksum-verified GitHub release instead. Never `curl | bash` an
+installer; download, verify against the project's own published checksums, then extract.
+
+```bash
+TFLINT_VERSION=v0.64.0
+curl -fsSL "https://github.com/terraform-linters/tflint/releases/download/${TFLINT_VERSION}/tflint_darwin_arm64.zip" -o /tmp/tflint.zip
+curl -fsSL "https://github.com/terraform-linters/tflint/releases/download/${TFLINT_VERSION}/checksums.txt" -o /tmp/tflint-checksums.txt
+grep 'tflint_darwin_arm64.zip' /tmp/tflint-checksums.txt | awk '{print $1"  /tmp/tflint.zip"}' | shasum -a 256 -c -
+unzip -o /tmp/tflint.zip -d /opt/homebrew/bin && rm -f /tmp/tflint.zip /tmp/tflint-checksums.txt
 ```
 
 - [ ] **Step 3: Verify installation**
@@ -366,37 +378,77 @@ description = "Paths that legitimately contain secret-shaped strings"
 paths = [
   '''\.gitleaks\.toml$''',
   '''terraform\.tfvars\.example$''',
-  '''projects/weysure/docs/.*\.md$''',
 ]
 
 [[rules]]
 id = "terraform-inline-password"
 description = "A password, secret or token assigned literally in a .tf or .tfvars file"
 regex = '''(?i)(password|secret|token|access_key)\s*=\s*"[^"$][^"]{7,}"'''
-path = '''\.tfvars?$'''
-[rules.allowlist]
-regexes = [
-  '''=\s*"(<redacted>|REPLACE_ME|CHANGEME|example)"''',
-]
+path = '''\.tf(vars)?$'''
+
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    '''=\s*"(<redacted>|REPLACE_ME|CHANGEME|EXAMPLE_VALUE)"''',
+  ]
 ```
 
-- [ ] **Step 5: Prove the rule catches a real secret**
+Three details are load-bearing, and each was wrong in the first draft of this plan. All three
+were found by running the config, not reading it:
+
+- **`path` must be `\.tf(vars)?$`, not `\.tfvars?$`.** The latter matches `.tfvar` and
+  `.tfvars` — it does **not** match `.tf`. Task 4 moves Terraform *code* into this repository,
+  and `.tf` is exactly where a literal password would land.
+- **`[[rules.allowlists]]` is plural and double-bracketed.** Gitleaks 8.x ignores a singular
+  `[rules.allowlist]` silently — no error, no warning; the exemption simply never applies.
+- **`regexTarget = "match"` is required.** Without it the regex is tested against the captured
+  secret rather than the whole match, so a pattern written as `=\s*"CHANGEME"` never fires.
+
+The docs directory is deliberately **not** exempted. A global `[allowlist] paths` entry exempts
+that path from *every* rule, so `projects/weysure/docs/**.md` would go unscanned entirely —
+including for private keys. Design documentation is precisely where a real value gets pasted by
+accident. Allowlist specific findings when they actually occur; never pre-emptively exempt a
+whole directory.
+
+- [ ] **Step 5: Prove the rule fires when it should AND stays quiet when it shouldn't**
+
+A positive canary alone is half a test — and it is the half that passes whether or not the
+exemptions work. Test all four cases:
+
+| Canary | Content | Expected |
+|---|---|---|
+| `canary.tf` | `password = "NotARealPasswordButLooksLikeOne123"` | **1** — proves `.tf` coverage |
+| `canary.tfvars` | `db_password = "NotARealPasswordButLooksLikeOne123"` | **1** |
+| `placeholders.tfvars` | `db_password = "CHANGEME"`, `token = "REPLACE_ME"` | **0** — proves the allowlist works |
+| `projects/weysure/docs/CANARY.md` | a synthetic private-key block, assembled at runtime | **1** — proves docs are still scanned |
 
 ```bash
 cd ~/Documents/plateng-infra/plateng-infrastructure-tools
-printf 'db_password = "NotARealPasswordButLooksLikeOne123"\n' > /tmp/canary.tfvars
-cp /tmp/canary.tfvars ./canary.tfvars
-gitleaks detect --no-git --source . --config .gitleaks.toml --redact -v ; echo "exit=$?"
+printf 'password = "NotARealPasswordButLooksLikeOne123"\n' > canary.tf
+printf 'db_password = "NotARealPasswordButLooksLikeOne123"\n' > canary.tfvars
+printf 'db_password = "CHANGEME"\ntoken = "REPLACE_ME"\n' > placeholders.tfvars
+mkdir -p projects/weysure/docs
+{ printf -- '-----BEGIN RSA '; printf 'PRIVATE KEY-----\n'; head -c 96 /dev/zero | base64;
+  printf -- '-----END RSA '; printf 'PRIVATE KEY-----\n'; } > projects/weysure/docs/CANARY.md
+gitleaks detect --no-git --source . --config .gitleaks.toml --redact \
+  --report-format json --report-path /tmp/canary.json --exit-code 0
+python3 -c "
+import json,collections
+c=collections.Counter(x['File'] for x in json.load(open('/tmp/canary.json')))
+for f,exp in [('canary.tf',1),('canary.tfvars',1),('placeholders.tfvars',0),('projects/weysure/docs/CANARY.md',1)]:
+    got=c.get(f,0); print(('  PASS ' if got==exp else '  FAIL ')+f'{f}: expected {exp}, got {got}')
+"
 ```
 
-Expected: a finding for `canary.tfvars`, rule `terraform-inline-password`, and `exit=1`.
-`--redact` ensures the value is never printed.
+Expected: four `PASS` lines. Any `FAIL` means the config does not do what it claims — fix it
+before continuing. `--redact` means no value is ever printed.
 
 - [ ] **Step 6: Remove the canary and confirm the scan is clean**
 
 ```bash
-rm ./canary.tfvars /tmp/canary.tfvars
+rm -f ./canary.tf ./canary.tfvars ./placeholders.tfvars projects/weysure/docs/CANARY.md /tmp/canary.json
 gitleaks detect --no-git --source . --config .gitleaks.toml --redact ; echo "exit=$?"
+git status --short
 ```
 
 Expected: `exit=0`, no findings.
@@ -1258,7 +1310,7 @@ Resolves finding 12."
 
 Resolves Finding ⑭ and implements ADR-009. Verified prerequisites: the account is **not** in an
 AWS Organization (`AWSOrganizationsNotInUseException`), IAM Identity Center has **no instances**,
-and `s_user` has **one active access key**, `AKIA<redacted>`, created 2026-06-24.
+and `s_user` has **one active access key**, `the s_user access key`, created 2026-06-24.
 
 **Files:**
 - Modify: `projects/weysure/terraform/versions.tf` — backend and provider profile
@@ -1280,7 +1332,17 @@ aws iam list-access-keys --user-name s_user --profile personal \
 ```
 
 Expected: an `arn:aws:iam::767397877316:user/s_user` ARN; `AWSOrganizationsNotInUseException`;
-empty instance list; `AKIA<redacted>  Active`.
+an empty instance list; and exactly one key, `Active`, whose id begins `AKIA`.
+
+**Capture the id into a variable rather than pasting it anywhere.** `s_user` has exactly one
+key, so the lookup is unambiguous — and a plan that discovers the identifier cannot go stale,
+nor does it record a credential identifier in git:
+
+```bash
+export KEY_ID=$(aws iam list-access-keys --user-name s_user --profile personal \
+  --query 'AccessKeyMetadata[0].AccessKeyId' --output text)
+echo "operating on key: ${KEY_ID:0:8}…"
+```
 
 - [ ] **Step 2: Find every other consumer of the `personal` profile**
 
@@ -1400,13 +1462,13 @@ Expected: both lines read `profile = "weysure-sso"`, and `Success! The configura
 Deactivate first. If something breaks, reactivation is instant; deletion is irreversible.
 
 ```bash
-aws iam update-access-key --user-name s_user --access-key-id AKIA<redacted> \
+aws iam update-access-key --user-name s_user --access-key-id "$KEY_ID" \
   --status Inactive --profile weysure-sso
 aws iam list-access-keys --user-name s_user --profile weysure-sso \
   --query 'AccessKeyMetadata[].[AccessKeyId,Status]' --output text
 ```
 
-Expected: `AKIA<redacted>  Inactive`.
+Expected: the same key id, now `Inactive`.
 
 - [ ] **Step 11: Work normally for at least one full session**
 
@@ -1416,7 +1478,7 @@ proceed. If something does, reactivate with `--status Active` and investigate.
 - [ ] **Step 12: Delete the access key** *(irreversible — [HUMAN])*
 
 ```bash
-aws iam delete-access-key --user-name s_user --access-key-id AKIA<redacted> --profile weysure-sso
+aws iam delete-access-key --user-name s_user --access-key-id "$KEY_ID" --profile weysure-sso
 aws iam list-access-keys --user-name s_user --profile weysure-sso --query 'AccessKeyMetadata' --output text
 ```
 
@@ -1442,7 +1504,7 @@ Replaces the static IAM user access key with a 1-hour SSO session assumed
 through the PlatformAdmin permission set (ADR-009, finding 14).
 
 AWS Organizations was enabled first, as Identity Center requires it. The
-access key AKIA<redacted> was deactivated, verified over a full
+access key the s_user access key was deactivated, verified over a full
 working session, then deleted. A leaked credential is now a 60-minute
 problem rather than a permanent one."
 ```
@@ -1937,7 +1999,7 @@ Every item verified, not assumed.
 - [ ] Branch protection active on all four repositories; direct push to `main` proven rejected
 - [ ] `CODEOWNERS` present on both platform repositories
 - [ ] AWS Organization created; IAM Identity Center live; `weysure-sso` profile assuming a role
-- [ ] Access key `AKIA<redacted>` deleted
+- [ ] The `s_user` access key deleted — `list-access-keys` returns empty
 - [ ] Budget `weysure-platform-monthly` active with three alerts
 - [ ] Provider `default_tags` applied; Cost Explorer can group by `Project`
 - [ ] `terraform plan` dry-run completed against the real backend, lock acquired and released, plan discarded
