@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is gitignored.
+# There is no master-password variable here: RDS generates it into AWS
+# Secrets Manager (ADR-010), so it never exists in this file or in state.
+
+environment            = "prod"
+project                = "weysure"
+region                 = "us-east-1"
+eks_node_instance_type = "m6i.large"
+eks_node_desired       = 1
+eks_node_min           = 1
+eks_node_max           = 2
+db_instance_class      = "db.t4g.micro"
