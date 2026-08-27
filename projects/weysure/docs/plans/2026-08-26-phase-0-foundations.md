@@ -73,9 +73,28 @@ successfully planned. Resolved in Task 4 — by deleting the variable entirely, 
 
 ### Finding ⑯ — `.env` with live secrets is in `Weysure-API` git history
 
-Commit `52f89f2` ("feat: Auth flow enhanced") **added a real `.env`**. Commit `6b2e901` removed
-it — but removal from `HEAD` does not remove it from history. Anyone who can clone the
-repository can run `git show 52f89f2:.env`.
+> **Scope corrected 2026-08-26 after the Task 2 full-history scan.** The original entry said
+> "one commit." That was wrong, and the error was methodological: `git log --diff-filter=A`
+> reports only the commit that *added* a path. It is blind to every later modification. The
+> real figure is **nine commits over roughly seven months.**
+
+`.env` was committed in `52f89f2` (2025-07-07) and then **updated repeatedly** until it was
+finally removed in `6b2e901`:
+
+```
+52f89f2  2025-07-07  feat: Auth flow enhanced                    <- first added
+a5d6f2e              feat: Logic up to Escrow creation
+12c4e2a              feat: Dispute and email service implemented
+c2ee677  2025-08-02  feat: Add profile image upload …            <- Paystack key present
+ba19687              feat: Refactor DEVELOPER_API_GUIDE.md …
+955257b              feat: Add admin payout accounts endpoint …
+79b054a  2026-02-13  feat: add rate limiting, environment-specific keys …  <- Paystack key present
+ac3bf73              feat(admin): add environment-based filtering …
+6b2e901              chore: remove .env file for security reasons  <- removed
+```
+
+**Every one of those versions is still readable in history.** Removal from `HEAD` removes
+nothing.
 
 Key names present (values deliberately not recorded here):
 
@@ -86,9 +105,35 @@ Key names present (values deliberately not recorded here):
 | `SUPABASE_JWT_SECRET`, `SUPABASE_WEBHOOK_SECRET` | Token forgery and webhook spoofing. |
 | `DATABASE_URL` | Complete Postgres credentials. |
 | `SMTP_PASSWORD` | Outbound mail as your domain. |
+| **Paystack secret key** | **Move money.** Gitleaks labels these `stripe-access-token` because Paystack uses the same `sk_test_` / `sk_live_` prefixes as Stripe. Present in `.env` at commits `c2ee677` and `79b054a`. |
 
-`innocent98/Weysure` also committed a `.env` (commit `fad698b`), but it contained only
-`NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` — public by definition. No action needed.
+### Finding ⑰ — Supabase credentials hardcoded in CI and test fixtures
+
+Separate from `.env`, and lower severity because the values belong to a **test** Supabase
+project (`SUPABASE_URL: https://test.supabase.co`), not production:
+
+| Location | Commit | Contents |
+|---|---|---|
+| `.github/workflows/ci.yml:26-28` | `da07574` (2026-04-02) | `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` as literals |
+| `tests/conftest.py:29-31` | `aac309a` | same three, as `os.environ.setdefault` defaults |
+| `tests/ws_test.py`, `tests/test_end_to_end.py` | various | hardcoded JWTs |
+
+`ci.yml` was later corrected to `${{ secrets.CI_* }}` in `e25b096` — the right fix going
+forward, but the literals remain in history.
+
+### Triaged as NOT exposures
+
+Checking these was the point of triage; scanning without it produces noise that gets ignored.
+
+| Location | Rule | Verdict |
+|---|---|---|
+| `.github/workflows/DEPLOYMENT.md:207` | `private-key` | **False positive.** A documentation example showing the *shape* of a GitHub secret, truncated with `...`. Not a key. |
+| `innocent98/Weysure` — 44 findings | `curl-auth-header`, `generic-api-key`, `jwt` | **Placeholders.** All in `DEVELOPER_API_GUIDE.md` and `components/developer/*.tsx` — documentation curl examples and developer-portal UI showing sample API keys. Spot-check a sample during Task 3; treat as benign unless one proves otherwise. |
+| `Weysure-API` — `logs/waysure_api.log`, `app/logs/waysure_api.log` | 17 findings | **Real, but low value.** A committed application log. Now correctly gitignored (`*.log`, `logs/`) and untracked at `HEAD`. Request-logged JWTs are short-lived and long expired. No rotation needed; covered by the history rewrite if you do one. |
+| `.env.example`, `app/schemas/admin.py` | various | Placeholder and OpenAPI example values. Benign. |
+
+`innocent98/Weysure` also committed a `.env` (commit `fad698b`) containing only
+`NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` — public by definition. No action.
 
 **Severity is bounded** — the repository is private and you are the only collaborator, and there
 are no live users yet. It is not an emergency. It *is* a real exposure, and rotation is the only
@@ -518,15 +563,23 @@ been readable must be treated as disclosed, regardless of who you believe had ac
 | `SUPABASE_ANON_KEY` | Rotates with the JWT secret | Public by design — low risk |
 | `DATABASE_URL` password | Supabase → Settings → Database → Reset password | Direct database access |
 | `SMTP_PASSWORD` | Mail provider console | Outbound mail as your domain |
+| **`PAYSTACK_SECRET_KEY`** | **Paystack dashboard → Settings → API Keys & Webhooks → Generate new secret key** | **Initiate transfers and refunds. Rotate this first.** |
+| `PAYSTACK_WEBHOOK_SECRET` | Paystack dashboard → Webhooks | Webhook spoofing — forged payment-success events |
+| Supabase **test-project** keys (Finding ⑰) | Supabase dashboard for the test project | Lower severity — test project, not production. Rotate after the production keys. |
 
 ## Order of operations
 
-1. **Rotate `SECRET_KEY` last.** Changing it invalidates every issued JWT, logging all sessions
-   out. Do it during a quiet window. There are no live users at time of writing, so this is free
-   today — it will not be later.
-2. Rotate Supabase keys first; update `.env` locally; restart the API; confirm health.
-3. Rotate SMTP; send one test message.
-4. Rotate `SECRET_KEY`; restart; log in again.
+1. **Paystack first.** It is the only credential on this list that can move money. Generate a
+   new secret key in the Paystack dashboard, update `.env`, restart, confirm a test charge
+   initialises. The old key is invalidated the moment you generate a new one.
+2. **Supabase production keys** — service role, JWT secret, webhook secret; then the database
+   password. Update `.env`, restart the API, confirm health.
+3. **SMTP** — rotate, then send one test message.
+4. **Supabase test-project keys** (Finding ⑰) — lower urgency, but do them in the same sitting
+   while you are already in the dashboard.
+5. **`SECRET_KEY` last.** Changing it invalidates every issued JWT, logging out every session.
+   Free today because there are no live users. It will not be free later — which is exactly why
+   this is worth doing now rather than after launch.
 
 ## Verification
 
