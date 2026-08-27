@@ -1,0 +1,696 @@
+<title>Weysure Platform Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root{
+  --ground:#F6F8F8; --surface:#FFFFFF; --surface-2:#EEF2F2;
+  --ink:#101619; --ink-2:#33454B; --muted:#617278;
+  --rule:#D9E1E2; --rule-strong:#B9C6C8;
+  --accent:#0C6E63; --accent-soft:#E2EFED; --accent-ink:#08514A;
+  --warn:#A34A08; --warn-soft:#F7EBE0;
+  --plate:#FBFCFC; --plate-rule:#C9D5D6;
+  --shadow:0 1px 2px rgba(16,22,25,.05), 0 8px 24px -18px rgba(16,22,25,.35);
+  --sans:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0C1113; --surface:#131A1D; --surface-2:#182125;
+    --ink:#E6ECED; --ink-2:#BCC9CC; --muted:#84969C;
+    --rule:#222D31; --rule-strong:#334348;
+    --accent:#43C3B1; --accent-soft:#10302D; --accent-ink:#8FE0D3;
+    --warn:#E0913F; --warn-soft:#2E2114;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0C1113; --surface:#131A1D; --surface-2:#182125;
+  --ink:#E6ECED; --ink-2:#BCC9CC; --muted:#84969C;
+  --rule:#222D31; --rule-strong:#334348;
+  --accent:#43C3B1; --accent-soft:#10302D; --accent-ink:#8FE0D3;
+  --warn:#E0913F; --warn-soft:#2E2114;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--serif); font-size:17px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:56px;align-items:start}
+@media (max-width:1000px){.layout{grid-template-columns:1fr;gap:0}.toc{display:none}}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--rule);background:var(--surface)}
+.mast-inner{padding:44px 0 30px;display:flex;flex-direction:column;gap:20px}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;align-items:center
+}
+h1{
+  font-family:var(--sans);font-weight:700;font-size:clamp(2.1rem,5vw,3.3rem);
+  line-height:1.03;letter-spacing:-.028em;margin:0;text-wrap:balance;color:var(--ink)
+}
+.standfirst{font-size:1.15rem;color:var(--ink-2);max-width:60ch;margin:0}
+.facts{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden;margin-top:6px}
+.fact{flex:1 1 150px;padding:13px 16px;border-right:1px solid var(--rule);background:var(--surface)}
+.fact:last-child{border-right:0}
+.fact dt{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.fact dd{margin:0;font-family:var(--sans);font-weight:600;font-size:1.02rem;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.fact dd.pos{color:var(--accent)}
+
+/* ---------- toc ---------- */
+.toc{position:sticky;top:22px;padding-top:46px}
+.toc h2{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:500}
+.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.toc a{
+  display:flex;gap:9px;text-decoration:none;color:var(--muted);
+  font-family:var(--sans);font-size:12.5px;line-height:1.35;padding:5px 8px;border-radius:3px;
+  border-left:2px solid transparent;transition:color .12s,background .12s,border-color .12s
+}
+.toc a:hover,.toc a:focus-visible{color:var(--ink);background:var(--surface-2);border-left-color:var(--accent)}
+.toc .n{font-family:var(--mono);font-size:10.5px;color:var(--rule-strong);padding-top:1px;min-width:14px}
+
+/* ---------- sections ---------- */
+main{padding:46px 0 90px;min-width:0}
+section{margin:0 0 62px;scroll-margin-top:24px}
+h2.sec{
+  font-family:var(--sans);font-weight:600;font-size:1.5rem;letter-spacing:-.018em;
+  margin:0 0 6px;color:var(--ink);text-wrap:balance
+}
+.sec-rule{height:1px;background:var(--rule);margin:0 0 22px}
+.lede{color:var(--ink-2);max-width:66ch;margin:0 0 22px}
+p{max-width:66ch}
+h3{font-family:var(--sans);font-weight:600;font-size:1.05rem;letter-spacing:-.01em;margin:30px 0 8px}
+strong{font-weight:600}
+code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);padding:.12em .38em;border-radius:3px;color:var(--ink)}
+a{color:var(--accent-ink);text-underline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+/* ---------- plates ---------- */
+.plate{border:1px solid var(--plate-rule);border-radius:4px;background:var(--plate);margin:24px 0;overflow:hidden}
+.plate-head{
+  display:flex;align-items:baseline;gap:12px;padding:9px 14px;
+  border-bottom:1px solid var(--plate-rule);background:#F1F5F5
+}
+.plate-num{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;color:#0C6E63}
+.plate-title{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:#3B4C52}
+.plate-body{overflow-x:auto;padding:20px 16px;background:var(--plate)}
+.plate-body pre.mermaid{margin:0;min-width:min-content;text-align:center;background:transparent}
+.plate-note{font-size:.92rem;color:var(--muted);margin:10px 0 0;max-width:70ch}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:4px;margin:20px 0;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:13.5px;min-width:520px}
+th{
+  text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);padding:11px 14px;border-bottom:1px solid var(--rule-strong);white-space:nowrap;background:var(--surface-2)
+}
+td{padding:11px 14px;border-bottom:1px solid var(--rule);color:var(--ink-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;color:var(--ink)}
+td strong,th strong{color:var(--ink)}
+tfoot td{font-weight:600;color:var(--ink);border-top:1px solid var(--rule-strong);background:var(--surface-2)}
+
+/* ---------- chips ---------- */
+.chip{
+  display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;
+  padding:2px 7px;border-radius:3px;text-transform:uppercase;white-space:nowrap
+}
+.chip.crit{background:var(--warn-soft);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.chip.ok{background:var(--accent-soft);color:var(--accent-ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+.chip.flat{background:var(--surface-2);color:var(--muted);border:1px solid var(--rule)}
+
+/* ---------- adr ---------- */
+.adrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px;margin:22px 0}
+.adr{border:1px solid var(--rule);border-radius:4px;padding:14px 16px;background:var(--surface);display:flex;flex-direction:column;gap:7px}
+.adr-id{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--accent)}
+.adr-t{font-family:var(--sans);font-weight:600;font-size:.95rem;line-height:1.32;letter-spacing:-.008em;color:var(--ink);margin:0}
+.adr-w{font-size:.87rem;color:var(--muted);margin:0;line-height:1.5}
+
+/* ---------- callout ---------- */
+.callout{
+  border-left:3px solid var(--warn);background:var(--warn-soft);
+  padding:14px 18px;border-radius:0 4px 4px 0;margin:22px 0
+}
+.callout p{margin:0;max-width:68ch;font-size:.96rem;color:var(--ink-2)}
+.callout .lbl{
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--warn);display:block;margin-bottom:5px
+}
+
+/* ---------- phases ---------- */
+.phases{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin:22px 0;background:var(--surface)}
+.ph{display:grid;grid-template-columns:44px minmax(0,190px) minmax(0,1fr);gap:16px;padding:13px 16px;border-bottom:1px solid var(--rule);align-items:baseline}
+.ph:last-child{border-bottom:0}
+.ph-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.ph-t{font-family:var(--sans);font-weight:600;font-size:.95rem;color:var(--ink);letter-spacing:-.008em}
+.ph-d{font-size:.9rem;color:var(--muted);line-height:1.5}
+@media (max-width:640px){.ph{grid-template-columns:36px 1fr;gap:10px}.ph-d{grid-column:2}}
+
+footer{border-top:1px solid var(--rule);padding:26px 0 60px;color:var(--muted);font-size:.88rem}
+footer p{max-width:70ch;margin:0 0 6px}
+footer .mono{font-family:var(--mono);font-size:11.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="mast-inner">
+      <div class="eyebrow">
+        <span>Beyric&nbsp;/&nbsp;plateng-infrastructure-tools</span>
+        <span>·</span><span>2026-08-26</span>
+        <span>·</span><span>brainstorm → <strong style="color:var(--accent)">spec</strong> → plan → implement</span>
+      </div>
+      <h1>Weysure Platform Blueprint</h1>
+      <p class="standfirst">Production platform design for a FastAPI + Next.js escrow application on AWS — from an empty account to GitOps-driven delivery, in eleven verifiable phases.</p>
+      <dl class="facts">
+        <div class="fact"><dt>Region</dt><dd>us-east-1</dd></div>
+        <div class="fact"><dt>Cluster</dt><dd>EKS 1.31</dd></div>
+        <div class="fact"><dt>Projected cost</dt><dd>$240–270<span style="color:var(--muted);font-weight:500">/mo</span></dd></div>
+        <div class="fact"><dt>Spent so far</dt><dd class="pos">$0.00</dd></div>
+        <div class="fact"><dt>Diagrams</dt><dd>10 verified</dd></div>
+      </dl>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#state"><span class="n">01</span><span>Where we start</span></a></li>
+      <li><a href="#target"><span class="n">02</span><span>Target state</span></a></li>
+      <li><a href="#network"><span class="n">03</span><span>Network topology</span></a></li>
+      <li><a href="#compute"><span class="n">04</span><span>Compute &amp; cost</span></a></li>
+      <li><a href="#delivery"><span class="n">05</span><span>Delivery pipeline</span></a></li>
+      <li><a href="#repos"><span class="n">06</span><span>Repositories</span></a></li>
+      <li><a href="#identity"><span class="n">07</span><span>Identity</span></a></li>
+      <li><a href="#secrets"><span class="n">08</span><span>Secrets</span></a></li>
+      <li><a href="#bootstrap"><span class="n">09</span><span>Bootstrap order</span></a></li>
+      <li><a href="#edge"><span class="n">10</span><span>Request path</span></a></li>
+      <li><a href="#migration"><span class="n">11</span><span>Database migration</span></a></li>
+      <li><a href="#failure"><span class="n">12</span><span>Failure modes</span></a></li>
+      <li><a href="#decisions"><span class="n">13</span><span>Decisions</span></a></li>
+      <li><a href="#phases"><span class="n">14</span><span>Phase plan</span></a></li>
+      <li><a href="#wa"><span class="n">15</span><span>Well-Architected</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <section id="state">
+    <h2 class="sec">Where we start</h2><div class="sec-rule"></div>
+    <p class="lede">Fourteen findings from a read-only investigation of the AWS account, both application repositories, and the uncommitted Terraform. Every claim is cited to a file and line, so any of them can be re-derived.</p>
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>Severity</th><th>Finding</th><th>Resolved in</th></tr></thead>
+      <tbody>
+        <tr><td class="num">①</td><td><span class="chip crit">Critical</span></td><td><strong>Plaintext database password</strong> in <code>terraform.tfvars</code>. Un-leaked only because the directory was never a git repository.</td><td>Phase 0 + 3</td></tr>
+        <tr><td class="num">②</td><td><span class="chip crit">Critical</span></td><td><strong>Infrastructure not under version control</strong> — no history, review, or rollback.</td><td>Phase 0</td></tr>
+        <tr><td class="num">③</td><td><span class="chip crit">Critical</span></td><td>Terraform provisions RDS in <code>us-east-1</code> while the app runs on Supabase in <code>eu-central-1</code>. <code>apply</code> would create a second, empty, <code>deletion_protection</code> database.</td><td>Phase 3</td></tr>
+        <tr><td class="num">④</td><td><span class="chip crit">High</span></td><td>EKS module declares no <code>access_config</code> and no access entries — <strong>only the creating principal can reach the cluster.</strong></td><td>Phase 1</td></tr>
+        <tr><td class="num">⑤</td><td><span class="chip crit">High</span></td><td>No EKS add-ons and no OIDC provider. Without the EBS CSI driver <strong>no PersistentVolume will ever bind</strong> — Prometheus, Grafana, Vault and Redis all fail to start.</td><td>Phase 1</td></tr>
+        <tr><td class="num">⑦</td><td><span class="chip flat">Medium</span></td><td><code>Jenkinsfile</code> performs deployment with long-lived AWS keys, contradicting the Jenkins-as-CI split. No secret scanning or quality gate.</td><td>Phase 6</td></tr>
+        <tr><td class="num">⑧</td><td><span class="chip flat">Medium</span></td><td>Pipeline deploys <code>weysure-worker</code> — <strong>there is no Celery in this project.</strong> That stage fails every build.</td><td>Phase 6</td></tr>
+        <tr><td class="num">⑨</td><td><span class="chip flat">Medium</span></td><td>Migrations run on every container start. With N replicas that is N concurrent migrations racing per rollout.</td><td>Phase 7</td></tr>
+        <tr><td class="num">⑪</td><td><span class="chip flat">Medium</span></td><td>ECR is <code>MUTABLE</code> and the pipeline pushes <code>:latest</code>. “We deployed v1.2.3” stops being verifiable.</td><td>Phase 1 + 6</td></tr>
+        <tr><td class="num">⑭</td><td><span class="chip crit">High</span></td><td>AWS operated as an IAM <em>user</em> with static access keys.</td><td>Phase 0</td></tr>
+      </tbody>
+    </table></div>
+    <h3>The finding that shrank the project</h3>
+    <p>Supabase looked like a platform dependency. Tracing every reference showed it is <strong>only hosted Postgres</strong>: passwords live in the application's own <code>users</code> table, hashed by <code>passlib</code>, with JWTs signed by the application's own key. <code>app/core/supabase.py</code> is never imported.</p>
+    <p>That matters more than it sounds. Had passwords lived in Supabase's managed <code>auth</code> schema, they could not be exported — the only exits would have been a forced password reset for every user of a wallet application, or a months-long migration shim. The migration is data-only.</p>
+  </section>
+
+  <section id="target">
+    <h2 class="sec">Target state</h2><div class="sec-rule"></div>
+    <p class="lede">Every component, and how they connect. Jenkins builds; Argo CD deploys; the two never overlap.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 01</span><span class="plate-title">target_state.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','secondaryColor':'#E1EBEA','tertiaryColor':'#F3F6F6','clusterBkg':'#F7FAFA','clusterBorder':'#C4D2D3','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart TB
+    DEV["Developer"] -->|"git push"| GH["GitHub<br/>4 repositories"]
+    GH --> JEN["Jenkins — CI only"]
+    subgraph CIGATES["CI quality gates"]
+      direction LR
+      GL["Gitleaks"]
+      SQ["SonarQube<br/>self-hosted"]
+      TST["tests + coverage"]
+      TRV["Trivy CVE scan"]
+    end
+    JEN --> CIGATES
+    CIGATES --> BLD["Docker build<br/>tag = git SHA"]
+    BLD --> ECR[("ECR · IMMUTABLE")]
+    BLD -->|"commit tag"| GOPS["plateng-gitops"]
+    GOPS --> ARGO["Argo CD — CD only"]
+    subgraph EKS["EKS cluster — us-east-1"]
+      ARGO
+      subgraph PLATFORM["Platform"]
+        KARP["Karpenter"]
+        TRAEFIK["Traefik"]
+        CM["cert-manager"]
+        EDNS["external-dns"]
+        VAULT["Vault"]
+        ESO["External Secrets"]
+        REL["Reloader"]
+        KYV["Kyverno"]
+      end
+      subgraph OBS["Observability"]
+        PROM["Prometheus"]
+        GRAF["Grafana"]
+        AM["Alertmanager"]
+        BB["Blackbox"]
+      end
+      subgraph APPNS["Applications"]
+        API["weysure-api"]
+        WEB["weysure-web"]
+        REDIS["Redis"]
+      end
+    end
+    ARGO -->|"reconciles"| PLATFORM
+    ARGO -->|"reconciles"| APPNS
+    ARGO -->|"reconciles"| OBS
+    KARP -->|"provisions nodes"| EKS
+    ECR -.->|"pull"| APPNS
+    RDS[("RDS PostgreSQL")]
+    KMS["AWS KMS"]
+    ASM["Secrets Manager"]
+    CFDNS["Cloudflare DNS"]
+    CFCDN["Cloudflare CDN + WAF"]
+    API --> REDIS
+    VAULT -->|"1h credentials"| API
+    VAULT <-->|"create / revoke"| RDS
+    API --> RDS
+    KMS -->|"auto-unseal"| VAULT
+    ASM -.->|"break-glass"| VAULT
+    EDNS --> CFDNS
+    CM -->|"DNS-01"| CFDNS
+    USER["Users — West Africa"] --> CFCDN --> NLB["Load Balancer"] --> TRAEFIK
+    TRAEFIK --> API
+    TRAEFIK --> WEB
+    BB --> PROM
+    API -->|"/metrics"| PROM
+    PROM --> GRAF
+    PROM --> AM
+</pre>
+      </div>
+    </div>
+    <p class="plate-note"><strong>Deferred by decision, not omission:</strong> Linkerd (a sidecar on every pod costs ~40% of the on-demand node); multi-AZ NAT; multi-AZ RDS. Each carries a recorded cost and a revisit trigger.</p>
+  </section>
+
+  <section id="network">
+    <h2 class="sec">Network topology</h2><div class="sec-rule"></div>
+    <p class="lede">Worker nodes live only in private subnets. Nothing in the cluster is directly reachable from the internet.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 02</span><span class="plate-title">vpc_topology.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','clusterBkg':'#F7FAFA','clusterBorder':'#C4D2D3','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart TB
+    IGW["Internet Gateway"]
+    subgraph VPC["VPC · 10.0.0.0/16 · us-east-1"]
+      subgraph AZA["us-east-1a"]
+        PUBA["Public 10.0.1.0/24"]
+        PRIA["Private 10.0.3.0/24"]
+        NAT["NAT Gateway<br/>single point of failure"]
+        NODE1["system node group<br/>1-2x m6i.large ON-DEMAND<br/>Karpenter · CoreDNS · Vault<br/>Argo CD · Traefik"]
+      end
+      subgraph AZB["us-east-1b"]
+        PUBB["Public 10.0.2.0/24"]
+        PRIB["Private 10.0.4.0/24"]
+        NODE2["Karpenter-provisioned<br/>spot · consolidating<br/>apps · SonarQube<br/>Prometheus · CI agents"]
+      end
+      NLB["Network Load Balancer"]
+      RDS[("RDS PostgreSQL<br/>private · not public")]
+      S3EP["S3 Gateway Endpoint<br/>free · bypasses NAT"]
+    end
+    IGW --> PUBA
+    IGW --> PUBB
+    PUBA --> NLB
+    PUBB --> NLB
+    NLB --> NODE1
+    NLB --> NODE2
+    PUBA --> NAT
+    PRIA -->|"0.0.0.0/0"| NAT
+    PRIB -->|"0.0.0.0/0"| NAT
+    NAT --> IGW
+    NODE1 --> RDS
+    NODE2 --> RDS
+    NODE1 --> S3EP
+    NODE2 --> S3EP
+</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="lbl">Accepted risk · single NAT Gateway</span>
+      <p>Both private subnets route through one NAT Gateway in <code>us-east-1a</code>. An AZ-a failure removes egress for healthy AZ-b nodes too — image pulls and outbound API calls stop. It saves $33/month. Revisit on a budget increase or the first AZ incident.</p>
+    </div>
+  </section>
+
+  <section id="compute">
+    <h2 class="sec">Compute &amp; cost</h2><div class="sec-rule"></div>
+    <p class="lede">The originally configured two <code>t3.medium</code> nodes provide ~3.5 vCPU / 6.4 GiB allocatable. The platform stack requests 4.5–6 vCPU and 13–17 GiB. Pods would sit <code>Pending</code> — the problem was arithmetic, not configuration.</p>
+    <h3>Why <code>m6i</code>, not <code>t3</code></h3>
+    <p><code>t3</code> is <em>burstable</em>: it earns CPU credits while idle and sustains only 20–30% of a vCPU once they run out. A Kubernetes node runs many always-on controllers plus bursty work — Prometheus scrapes, SonarQube analysis, image builds — which drains credits reliably. The throttle then presents as <strong>unexplained slowness rather than an error</strong>, which is expensive to diagnose. <code>m6i</code> is fixed-performance: 2 vCPU means 2 vCPU, always.</p>
+    <p>Under Karpenter this softens into a preference rather than a lock — the NodePool permits a family set (<code>m6i m7i m6a m5 c6i r6i</code>) and Karpenter picks the cheapest instance that fits the pending pods.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Item</th><th>Choice</th><th style="text-align:right">$/mo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>EKS control plane</strong></td><td>fixed, unavoidable</td><td class="num">73</td></tr>
+        <tr><td><code>system</code> node group</td><td>1 × m6i.large on-demand</td><td class="num">70</td></tr>
+        <tr><td>Karpenter-provisioned</td><td>spot, consolidating</td><td class="num">22–48</td></tr>
+        <tr><td>NAT Gateway</td><td>1, single AZ</td><td class="num">33</td></tr>
+        <tr><td>S3 Gateway Endpoint</td><td>removes NAT charges on image pulls</td><td class="num">0</td></tr>
+        <tr><td>Network Load Balancer</td><td>1, for Traefik</td><td class="num">18</td></tr>
+        <tr><td>RDS db.t4g.micro + 20 GB</td><td>single-AZ</td><td class="num">14</td></tr>
+        <tr><td>EBS volumes</td><td>~60 GB gp3</td><td class="num">6</td></tr>
+        <tr><td>ECR + data transfer</td><td>—</td><td class="num">8</td></tr>
+        <tr><td><strong>Cloudflare</strong></td><td>free plan — DNS, CDN, WAF, DDoS</td><td class="num">0</td></tr>
+        <tr><td>Route 53 / CloudFront</td><td>not used</td><td class="num">0</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="num">240–270</td></tr></tfoot>
+    </table></div>
+    <p class="plate-note">Roughly 70% of the cluster's footprint is platform rather than product. That ratio is normal for a small platform, and it is the honest input to “should we run Kubernetes at all?”</p>
+  </section>
+
+  <section id="delivery">
+    <h2 class="sec">Delivery pipeline</h2><div class="sec-rule"></div>
+    <p class="lede">The one property everything else follows from: Jenkins holds no cluster credentials. Its entire relationship with the cluster is a single git commit.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 03</span><span class="plate-title">cicd_flow.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','signalColor':'#33454B','signalTextColor':'#101619','actorBkg':'#E1EBEA','actorBorder':'#9DB0B4','noteBkgColor':'#E2EFED','noteBorderColor':'#0C6E63'}}}%%
+sequenceDiagram
+    actor Dev as Developer
+    participant GH as GitHub (app repo)
+    participant J as Jenkins (CI)
+    participant ECR as Amazon ECR
+    participant G as plateng-gitops
+    participant A as Argo CD
+    participant K as EKS cluster
+    Dev->>GH: push to feature branch, open PR
+    GH->>J: webhook
+    J->>J: Gitleaks — secret scan
+    J->>J: SonarQube — quality gate
+    J->>J: tests + coverage
+    J->>J: docker build (tag = git SHA)
+    J->>J: Trivy — image CVE scan
+    J->>ECR: push image (IRSA, no static keys)
+    J->>G: commit image tag
+    Note over J,G: The ONLY handoff.<br/>Jenkins has no kubeconfig.
+    A->>G: detects new commit
+    A->>K: apply manifests
+    K->>ECR: image pull
+    A-->>Dev: sync status and health
+</pre>
+      </div>
+    </div>
+    <p class="plate-note"><strong>Rollback is <code>git revert</code>.</strong> Argo CD reconciles back to the previous image tag. There is no separate rollback tool and no judgement call.</p>
+  </section>
+
+  <section id="repos">
+    <h2 class="sec">Repositories</h2><div class="sec-rule"></div>
+    <p class="lede">The repository Argo CD watches must never be the repository developers push application code to. If they are the same, CI triggers itself in a loop, every commit becomes a potential deploy, and you lose the audit distinction between <em>built</em> and <em>deployed</em> — the exact question asked during an incident.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 04</span><span class="plate-title">repo_topology.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','clusterBkg':'#F7FAFA','clusterBorder':'#C4D2D3','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart TB
+    subgraph SRC["Source repos — developers push here"]
+      API["innocent98/Weysure-API"]
+      WEB["innocent98/Weysure"]
+    end
+    subgraph IAC["Infrastructure — Terraform"]
+      INFRA["Beyric/plateng-infrastructure-tools<br/>projects/weysure/"]
+    end
+    subgraph GOPS["GitOps — desired cluster state"]
+      BOOT["bootstrap/ · app-of-apps"]
+      PLAT["platform/"]
+      APPS["apps/"]
+      ENVS["environments/stage · prod<br/>image tags live here"]
+    end
+    JEN["Jenkins — CI only"]
+    ECRR[("ECR")]
+    ARGO["Argo CD — CD only"]
+    EKS["EKS cluster"]
+    API --> JEN
+    WEB --> JEN
+    JEN -->|"image:git-sha"| ECRR
+    JEN -->|"tag commit"| ENVS
+    INFRA -->|"terraform apply<br/>human-gated"| EKS
+    BOOT --> PLAT
+    BOOT --> APPS
+    APPS --> ENVS
+    GOPS -->|"reconciles"| ARGO
+    ARGO -->|"applies"| EKS
+    ECRR -.->|"pull"| EKS
+</pre>
+      </div>
+    </div>
+    <p class="plate-note"><strong>Terraform is deliberately not watched by Argo CD.</strong> Argo CD reconciles Kubernetes objects; cloud resources stay behind a human-gated <code>apply</code>. Blurring that line invites “Argo CD deleted our RDS instance.”</p>
+  </section>
+
+  <section id="identity">
+    <h2 class="sec">Identity</h2><div class="sec-rule"></div>
+    <p class="lede">Designed before secrets, deliberately. Secrets management without identity is just a nicer place to keep the same static credential.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 05</span><span class="plate-title">identity_layers.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','clusterBkg':'#F7FAFA','clusterBorder':'#C4D2D3','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart TB
+    subgraph L1["Layer 1 · Human to AWS"]
+      YOU["Engineer"] -->|"SSO · MFA · 1-hour session"| ROLE["IAM role PlatformAdmin"]
+    end
+    subgraph L2["Layer 2 · Human to Cluster"]
+      ROLE -->|"aws_eks_access_entry<br/>declared in Terraform"| KADM["cluster-admin"]
+    end
+    subgraph L3["Layer 3 · Pod to AWS — IRSA"]
+      OIDC["EKS OIDC provider"]
+      OIDC --> SA1["vault · KMS + S3"]
+      OIDC --> SA2["cert-manager"]
+      OIDC --> SA3["ebs-csi · volumes"]
+      OIDC --> SA4["jenkins · ECR push"]
+      OIDC --> SA5["karpenter · EC2"]
+    end
+    subgraph L4["Layer 4 · Pod to Vault"]
+      ESOSA["external-secrets SA"] -->|"Kubernetes auth"| VPOL["policy eso-read"]
+    end
+</pre>
+      </div>
+    </div>
+    <p class="plate-note"><strong>Application pods hold no AWS identity at all.</strong> They receive database credentials from Vault, so there is nothing for them to assume and nothing to leak. Jenkins pushes to ECR via IRSA — no AWS access keys exist anywhere in the pipeline.</p>
+  </section>
+
+  <section id="secrets">
+    <h2 class="sec">Secrets</h2><div class="sec-rule"></div>
+    <p class="lede">The deciding factor for Vault over AWS Secrets Manager is dynamic credentials. Vault issues a Postgres user valid for one hour, then revokes it — so there is no standing application database password anywhere.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 06</span><span class="plate-title">secrets_flow.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart LR
+    KMS["AWS KMS key"] -->|"auto-unseal via IRSA"| VAULT["Vault<br/>Raft, in-cluster"]
+    VAULT -->|"KV v2 — static"| ESO["External Secrets Operator"]
+    VAULT -->|"database engine<br/>1-hour Postgres user"| ESO
+    ESO -->|"creates + refreshes"| KSEC["Kubernetes Secret"]
+    KSEC -->|"envFrom"| POD["weysure-api pod"]
+    KSEC -.->|"change detected"| RELOAD["Reloader"]
+    RELOAD -->|"rolling restart"| POD
+    ASM["AWS Secrets Manager"] -.->|"break-glass:<br/>recovery keys<br/>RDS master password"| VAULT
+    VAULT <-->|"CREATE USER, then REVOKE"| RDS[("RDS PostgreSQL")]
+    POD --> RDS
+</pre>
+      </div>
+    </div>
+    <h3>Where each secret lives</h3>
+    <div class="tw"><table>
+      <thead><tr><th>Class</th><th>Home</th><th>Lifetime</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Dynamic</strong> — Postgres credentials</td><td>Vault database engine</td><td><strong>1 hour</strong>, auto-revoked</td></tr>
+        <tr><td>Static app — API keys, SMTP, webhooks</td><td>Vault KV v2</td><td>scheduled rotation</td></tr>
+        <tr><td>Platform — GitHub App key, admin logins</td><td>Vault KV v2</td><td>scheduled rotation</td></tr>
+        <tr><td>Break-glass — Vault recovery keys</td><td>AWS Secrets Manager</td><td>never stored in Vault</td></tr>
+        <tr><td><strong>Not actually secret</strong> — CORS origins, worker counts, intervals</td><td>ConfigMap, in git</td><td>reviewable in PRs</td></tr>
+      </tbody>
+    </table></div>
+    <p class="plate-note">Roughly a third of the application's <code>.env</code> is not secret. Moving it to a ConfigMap makes it diffable in pull requests and removes it from the blast radius. Treating an entire <code>.env</code> as one opaque secret is the most common secrets-management mistake.</p>
+  </section>
+
+  <section id="bootstrap">
+    <h2 class="sec">Bootstrap order</h2><div class="sec-rule"></div>
+    <p class="lede">Every secrets system has a bootstrap secret. The question is never whether one can be eliminated, but how few there are, who knows they exist, and whether they are written down.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 07</span><span class="plate-title">bootstrap_order.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70'}}}%%
+flowchart TB
+    T["1. Terraform<br/>VPC · EKS · IRSA · KMS · ECR · RDS"]
+    B["2. Manual bootstrap — once, documented<br/>helm install argo-cd<br/>+ 1 hand-created GitHub credential"]
+    A["3. Argo CD adopts itself<br/>installs all platform components"]
+    V["4. Vault initialised once by a human<br/>recovery keys to Secrets Manager<br/>root token revoked immediately"]
+    C["5. Vault configured<br/>policies · k8s auth · database engine"]
+    E["6. ESO reads Vault, writes K8s Secrets"]
+    APP["7. Applications deployed"]
+    T --> B --> A --> V --> C --> E --> APP
+    style B stroke-dasharray: 5 5
+    style V stroke-dasharray: 5 5
+</pre>
+      </div>
+    </div>
+    <p class="plate-note">Two manual gates, both deliberate. Argo CD's git credential cannot come from Vault, because Vault is installed <em>by</em> Argo CD — so it is created deliberately, documented in a runbook, and rotated once Vault is live. Vault cannot store its own recovery keys, so they go to AWS Secrets Manager and the root token is revoked.</p>
+  </section>
+
+  <section id="edge">
+    <h2 class="sec">Request path</h2><div class="sec-rule"></div>
+    <p class="lede"><code>us-east-1</code> is ~140–180 ms from Lagos against ~95 ms from Frankfurt. Cloudflare's free plan mitigates that better than CloudFront would, at zero cost.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 08</span><span class="plate-title">request_path.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','edgeLabelBackground':'#FBFCFC'}}}%%
+flowchart LR
+    U["User — Lagos"] -->|"HTTPS"| CFE["Cloudflare edge · Lagos PoP<br/>TLS terminates here<br/>CDN · WAF · DDoS"]
+    CFE -->|"Full (strict) TLS"| NLB["Network Load Balancer<br/>us-east-1"]
+    NLB --> TR["Traefik IngressRoute"]
+    TR -->|"weysure.beyrictech.com"| WEB["weysure-web"]
+    TR -->|"weysure-api.beyrictech.com"| API["weysure-api"]
+    API --> REDIS[("Redis")]
+    API --> RDS[("RDS PostgreSQL")]
+    CM["cert-manager"] -.->|"Let's Encrypt<br/>Cloudflare DNS-01"| TR
+    EDNS["external-dns"] -.-> CFDNS["Cloudflare DNS"]
+    CFDNS -.->|"resolves, proxied"| CFE
+</pre>
+      </div>
+    </div>
+    <p class="plate-note">TLS terminating at a Lagos PoP means the expensive handshake never crosses the Atlantic. The NLB's security group admits <strong>only Cloudflare's published IP ranges</strong>, so the origin is never publicly reachable — a security gain as much as a performance one. Origin TLS is Full (strict) against a real Let's Encrypt certificate, never Flexible.</p>
+  </section>
+
+  <section id="migration">
+    <h2 class="sec">Database migration</h2><div class="sec-rule"></div>
+    <p class="lede">Supabase Postgres in <code>eu-central-1</code> to RDS in <code>us-east-1</code>. Rehearsed before executed — even though there are no live users yet, because rehearsing when it is cheap is what makes the procedure trustworthy when it isn't.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 09</span><span class="plate-title">db_migration.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70','clusterBkg':'#F7FAFA','clusterBorder':'#C4D2D3'}}}%%
+flowchart TB
+    subgraph NOW["Current"]
+      APP1["weysure-api"] -->|"DATABASE_URL"| SUPA[("Supabase Postgres<br/>eu-central-1 pooler")]
+    end
+    subgraph STEPS["Migration"]
+      S1["1. Schema parity — alembic heads vs live DB"]
+      S2["2. pg_dump from Supabase"]
+      S3["3. pg_restore into RDS — rehearsal"]
+      S4["4. Row-count + checksum per table"]
+      S5["5. Smoke test against RDS"]
+      S6["6. Freeze writes, final dump, restore, verify"]
+      S7["7. Flip to Vault-issued credentials"]
+      S8["8. Observe; Supabase read-only for rollback"]
+      S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8
+    end
+    subgraph TARGET["Target"]
+      APP2["weysure-api"] -->|"1-hour Vault credentials"| RDS[("RDS PostgreSQL<br/>private subnet")]
+    end
+    NOW --> STEPS --> TARGET
+</pre>
+      </div>
+    </div>
+    <p class="plate-note">Cross-region logical replication would run over the public internet, so a dump-and-restore with a write freeze is used instead — simpler to reason about and simpler to rehearse. Supabase is retained read-only until the new database has been observed healthy; reverting is a <code>DATABASE_URL</code> change.</p>
+  </section>
+
+  <section id="failure">
+    <h2 class="sec">Failure modes</h2><div class="sec-rule"></div>
+    <p class="lede">A Well-Architected review that finds nothing is a review that was not done. These are the accepted weaknesses, stated plainly.</p>
+    <div class="plate">
+      <div class="plate-head"><span class="plate-num">PLATE 10</span><span class="plate-title">failure_modes.mmd</span></div>
+      <div class="plate-body">
+<pre class="mermaid">
+%%{init:{'theme':'base','themeVariables':{'fontFamily':'JetBrains Mono, monospace','fontSize':'12px','primaryColor':'#EDF3F2','primaryTextColor':'#101619','primaryBorderColor':'#9DB0B4','lineColor':'#5B6A70'}}}%%
+flowchart TB
+    F1["us-east-1a fails"] --> I1["NAT Gateway lost. All private-subnet<br/>egress dies, including healthy AZ-b nodes."]
+    F2["Spot reclaim — 2 min notice"] --> I2["Karpenter drains via SQS and provisions<br/>a replacement. Prometheus loses scrapes."]
+    F3["Bad Kyverno policy"] --> I3["Both namespaces affected —<br/>stage and prod share one cluster."]
+    F4["RDS instance failure"] --> I4["Single-AZ: restore from PITR.<br/>RPO ~5 min · RTO ~20 min."]
+    F5["Vault sealed or down"] --> I5["No new secrets issued. Running pods keep<br/>current credentials until the 1-hour TTL."]
+    F6["Argo CD down"] --> I6["No new deployments.<br/>Running workloads unaffected."]
+    F7["Jenkins compromised"] --> I7["Images and tags can be pushed, but there are<br/>no cluster credentials. Review gates the blast."]
+    F8["system node group lost"] --> I8["Karpenter down ~3-5 min until the managed<br/>node group replaces it. Existing nodes fine."]
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="decisions">
+    <h2 class="sec">Decisions</h2><div class="sec-rule"></div>
+    <p class="lede">Thirteen records. Each carries the alternatives considered, the consequences accepted, and the trigger that should make us change our minds — because decisions without recorded reasoning become cargo cult within about six weeks.</p>
+    <div class="adrs">
+      <div class="adr"><span class="adr-id">ADR-001</span><p class="adr-t">Migrate Supabase → RDS PostgreSQL</p><p class="adr-w">Enables Vault dynamic credentials, which Supabase cannot provide. Verified as data-only.</p></div>
+      <div class="adr"><span class="adr-id">ADR-002</span><p class="adr-t">All infrastructure in us-east-1</p><p class="adr-w">Cheapest, widest coverage. Latency mitigated at the Cloudflare edge.</p></div>
+      <div class="adr"><span class="adr-id">ADR-003</span><p class="adr-t">One managed system node group; m6i over t3</p><p class="adr-w">Breaks Karpenter's chicken-and-egg. Fixed-performance avoids credit throttling.</p></div>
+      <div class="adr"><span class="adr-id">ADR-004</span><p class="adr-t">Defer Linkerd, multi-AZ NAT, multi-AZ RDS</p><p class="adr-w">Each with a recorded cost and a revisit trigger. Consciously accepted, not overlooked.</p></div>
+      <div class="adr"><span class="adr-id">ADR-005</span><p class="adr-t">Four repos; Jenkins CI-only, zero cluster credentials</p><p class="adr-w">Deployed state becomes a pure function of a git commit.</p></div>
+      <div class="adr"><span class="adr-id">ADR-006</span><p class="adr-t">One cluster, two namespaces</p><p class="adr-w">A second cluster costs $73/mo plus nodes. Known weakness; mitigated by quotas and policy.</p></div>
+      <div class="adr"><span class="adr-id">ADR-007</span><p class="adr-t">Vault OSS in-cluster, KMS auto-unseal</p><p class="adr-w">Auto-unseal is not optional — manual unsealing on every restart is the top cause of Vault outages.</p></div>
+      <div class="adr"><span class="adr-id">ADR-008</span><p class="adr-t">External Secrets Operator over VSO</p><p class="adr-w">Manifests describe what secret is wanted, not where it lives. Changing store touches one resource.</p></div>
+      <div class="adr"><span class="adr-id">ADR-009</span><p class="adr-t">IAM Identity Center replaces static keys</p><p class="adr-w">A leaked credential becomes a 60-minute problem instead of a permanent one.</p></div>
+      <div class="adr"><span class="adr-id">ADR-010</span><p class="adr-t">RDS manage_master_user_password</p><p class="adr-w">The master password never enters Terraform state. Terraform cannot read it back — that is the point.</p></div>
+      <div class="adr"><span class="adr-id">ADR-011</span><p class="adr-t">Cloudflare for DNS and edge</p><p class="adr-w">Free plan beats CloudFront for West African users, and hides the origin behind known IP ranges.</p></div>
+      <div class="adr"><span class="adr-id">ADR-012</span><p class="adr-t">Adopt Karpenter</p><p class="adr-w">Bin-packs to the cheapest instance that fits and consolidates idle nodes. Replaces the Cluster Autoscaler and the Node Termination Handler.</p></div>
+      <div class="adr"><span class="adr-id">ADR-013</span><p class="adr-t">Self-host SonarQube in-cluster</p><p class="adr-w">Heaviest single addition. Requires vm.max_map_count on the host or Elasticsearch crash-loops.</p></div>
+    </div>
+  </section>
+
+  <section id="phases">
+    <h2 class="sec">Phase plan</h2><div class="sec-rule"></div>
+    <p class="lede">Eleven phases, each its own brainstorm → plan → spec → implement cycle, each producing a diagram update, an SOP, and a rehearsed rollback.</p>
+    <div class="phases">
+      <div class="ph"><span class="ph-n">00</span><span class="ph-t">Foundations &amp; guardrails</span><span class="ph-d">Repos governed, secrets purged, Gitleaks active, SSO live, static keys deleted. <strong>$0 spent.</strong></span></div>
+      <div class="ph"><span class="ph-n">01</span><span class="ph-t">Network &amp; cluster</span><span class="ph-d">VPC, EKS 1.31, add-ons, IRSA, access entries, Karpenter provisioning and consolidating.</span></div>
+      <div class="ph"><span class="ph-n">02</span><span class="ph-t">Cluster baseline</span><span class="ph-d">Storage, Cloudflare delegation, Traefik, cert-manager, external-dns. A real HTTPS URL serves traffic.</span></div>
+      <div class="ph"><span class="ph-n">03</span><span class="ph-t">Data layer</span><span class="ph-d">RDS with managed master password, migration rehearsed and cut over, Redis, restore drill timed.</span></div>
+      <div class="ph"><span class="ph-n">04</span><span class="ph-t">Secrets</span><span class="ph-d">Vault initialised, policies, database engine issuing 1-hour credentials, ESO syncing, Reloader verified.</span></div>
+      <div class="ph"><span class="ph-n">05</span><span class="ph-t">GitOps</span><span class="ph-d">Argo CD self-managing, app-of-apps reconciling, drift alerting, git-revert rollback demonstrated.</span></div>
+      <div class="ph"><span class="ph-n">06</span><span class="ph-t">Continuous integration</span><span class="ph-d">Jenkins on ephemeral agents, SonarQube, Gitleaks, Trivy gating. No cluster credentials anywhere.</span></div>
+      <div class="ph"><span class="ph-n">07</span><span class="ph-t">Application delivery</span><span class="ph-d">Helm charts, probes, HPA, PDB. Migrations move to a PreSync hook, out of container start.</span></div>
+      <div class="ph"><span class="ph-n">08</span><span class="ph-t">Policy</span><span class="ph-d">Kyverno in audit before enforce, default-deny NetworkPolicies, quotas per namespace.</span></div>
+      <div class="ph"><span class="ph-n">09</span><span class="ph-t">Observability</span><span class="ph-d">Prometheus, Grafana, Alertmanager, Blackbox. Alerts tested by inducing real failures.</span></div>
+      <div class="ph"><span class="ph-n">10</span><span class="ph-t">Production readiness</span><span class="ph-d">DR drill, SLOs, load test, cost review. Reliability gaps revisited with operational experience behind them.</span></div>
+    </div>
+    <p class="plate-note">Two orderings are deliberate and counter-intuitive. <strong>Secrets before GitOps:</strong> if Argo CD arrives first, a Kubernetes Secret gets committed to git to make something work, and it stays there. <strong>GitOps before CI:</strong> built first, Jenkins grows <code>kubectl</code> calls — exactly as the existing pipeline did.</p>
+  </section>
+
+  <section id="wa">
+    <h2 class="sec">Well-Architected review</h2><div class="sec-rule"></div>
+    <p class="lede">Six pillars — the original five plus Sustainability, added in December 2021.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Pillar</th><th>Addressed by</th><th>Accepted gaps</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Operational Excellence</strong></td><td>IaC throughout; git as audit log; ADRs; runbooks and SOPs per phase</td><td>No observability until Phase 9</td></tr>
+        <tr><td><strong>Security</strong></td><td>Private-subnet nodes; NLB reachable only from Cloudflare; no standing DB password; CI holds no cluster credentials; Gitleaks, Trivy, SonarQube, Kyverno</td><td>Two documented bootstrap secrets; a Cloudflare token to rotate</td></tr>
+        <tr><td><strong>Reliability</strong></td><td>Two AZs; node self-healing; on-demand baseline for stateful; PITR with a <em>rehearsed</em> restore; Vault Raft snapshots</td><td><strong>Single NAT · single-AZ RDS · one cluster for both environments · single-replica Vault</strong></td></tr>
+        <tr><td><strong>Performance Efficiency</strong></td><td>Fixed-performance instances; Redis for hot reads; Cloudflare edge; Karpenter right-sizing; HPA</td><td>Load testing deferred to Phase 10</td></tr>
+        <tr><td><strong>Cost Optimization</strong></td><td>Karpenter consolidation and spot-first; free S3 endpoint; free Cloudflare edge instead of paid CloudFront; scale-to-zero CI</td><td>NAT instance and Graviton deferred</td></tr>
+        <tr><td><strong>Sustainability</strong></td><td>Spot uses otherwise-idle capacity; consolidation terminates underutilised nodes; edge caching reduces origin traffic</td><td>Graviton deferred</td></tr>
+      </tbody>
+    </table></div>
+    <p class="plate-note">The Reliability row names four structural weaknesses. That is intentional — each is a consciously accepted risk with a recorded cost and a trigger for revisiting, which is what separates a lean architecture from a cheap one.</p>
+  </section>
+
+  <footer>
+    <p><strong style="color:var(--ink)">Status:</strong> design complete, implementation not started. No AWS resources exist. All ten diagrams render-verified with <code>mermaid-cli</code> 11.16.0.</p>
+    <p class="mono">Beyric/plateng-infrastructure-tools · projects/weysure/ · PR #1</p>
+  </footer>
+  </main>
+</div>
