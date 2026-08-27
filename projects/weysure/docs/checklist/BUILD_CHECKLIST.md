@@ -35,9 +35,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `Beyric/plateng-gitops` created
   - [x] Design spec, architecture diagrams, ADRs, and this checklist committed
   - [x] `.gitignore` covering `*.tfvars`, `*.tfstate*`, `.terraform/`, `.env*`, `*.pem`
-  - [ ] Initialise `plateng-gitops` with its directory skeleton
-  - [ ] Branch protection on all four repos — require PR review, block force-push *(Finding ⑫)*
-  - [ ] `CODEOWNERS` on both platform repos
+  - [x] Initialise `plateng-gitops` with its directory skeleton
+  - [x] Branch protection on all four repos — require PR review, block force-push *(Finding ⑫)*
+  - [x] `CODEOWNERS` on both platform repos
 - [ ] **Secret hygiene** *(Finding ①)*
   - [x] Remove `db_password` from `terraform.tfvars` before any commit
   - [x] Gitleaks pre-commit hook installed locally
@@ -48,13 +48,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `terraform fmt` + `terraform validate` clean
   - [ ] `tflint` and `checkov` (or `tfsec`) baseline recorded
 - [ ] **AWS identity** *(Finding ⑭ / ADR-009)*
-  - [ ] Enable IAM Identity Center
+  - [x] Enable IAM Identity Center
   - [ ] Create `PlatformAdmin` permission set; assign to engineer
-  - [ ] Configure `aws sso` profile; verify `aws sts get-caller-identity`
+  - [x] Configure `aws sso` profile; verify `aws sts get-caller-identity`
   - [ ] Point Terraform backend + provider at the assumed role
   - [ ] **Delete `s_user` static access keys** once verified
 - [ ] **Cost guardrails**
-  - [ ] AWS Budget at $250/mo with alerts at 50 / 80 / 100%
+  - [x] AWS Budget at $250/mo with alerts at 50 / 80 / 100%
   - [ ] Cost Explorer enabled; tagging convention agreed
 - [ ] **State backend**
   - [x] Bucket `beyric-tfstate-767397877316` — versioning ✅, public access blocked ✅

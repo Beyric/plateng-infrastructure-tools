@@ -134,7 +134,14 @@ perpetual plan diff.
 
 Found by review of Task 4. Not previously tracked.
 
-### Finding ⑲ — Branch protection is unavailable on the current GitHub plan
+### Finding ⑲ — Branch protection unavailable on a free plan *(RESOLVED 2026-08-27)*
+
+**Resolved** by making both platform repositories public, which makes rulesets free. Active on
+both: `pull_request` required, `non_fast_forward`, `deletion`. Pre-flight before publishing
+confirmed 0 gitleaks findings across full history; the personal alert email and a deactivated
+access key id were scrubbed from history first, while the branch was still unpushed.
+Publishing also serves the portfolio goal. Original analysis below.
+
 
 Finding ⑫ cannot be closed as written. Verified against the API on all four repositories:
 
