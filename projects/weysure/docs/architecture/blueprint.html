@@ -210,9 +210,9 @@ footer .mono{font-family:var(--mono);font-size:11.5px}
     <div class="tw"><table>
       <thead><tr><th>#</th><th>Severity</th><th>Finding</th><th>Resolved in</th></tr></thead>
       <tbody>
-        <tr><td class="num">①</td><td><span class="chip crit">Critical</span></td><td><strong>Plaintext database password</strong> in <code>terraform.tfvars</code>. Un-leaked only because the directory was never a git repository.</td><td>Phase 0 + 3</td></tr>
+        <tr><td class="num">①</td><td><span class="chip crit">Critical</span></td><td><strong>Plaintext database password</strong> in <code>terraform.tfvars</code>. Un-leaked only because the directory was never a git repository.</td><td>Phase 0 + 5</td></tr>
         <tr><td class="num">②</td><td><span class="chip crit">Critical</span></td><td><strong>Infrastructure not under version control</strong> — no history, review, or rollback.</td><td>Phase 0</td></tr>
-        <tr><td class="num">③</td><td><span class="chip crit">Critical</span></td><td>Terraform provisions RDS in <code>us-east-1</code> while the app runs on Supabase in <code>eu-central-1</code>. <code>apply</code> would create a second, empty, <code>deletion_protection</code> database.</td><td>Phase 3</td></tr>
+        <tr><td class="num">③</td><td><span class="chip crit">Critical</span></td><td>Terraform provisions RDS in <code>us-east-1</code> while the app runs on Supabase in <code>eu-central-1</code>. <code>apply</code> would create a second, empty, <code>deletion_protection</code> database.</td><td>Phase 5</td></tr>
         <tr><td class="num">④</td><td><span class="chip crit">High</span></td><td>EKS module declares no <code>access_config</code> and no access entries — <strong>only the creating principal can reach the cluster.</strong></td><td>Phase 1</td></tr>
         <tr><td class="num">⑤</td><td><span class="chip crit">High</span></td><td>No EKS add-ons and no OIDC provider. Without the EBS CSI driver <strong>no PersistentVolume will ever bind</strong> — Prometheus, Grafana, Vault and Redis all fail to start.</td><td>Phase 1</td></tr>
         <tr><td class="num">⑦</td><td><span class="chip flat">Medium</span></td><td><code>Jenkinsfile</code> performs deployment with long-lived AWS keys, contradicting the Jenkins-as-CI split. No secret scanning or quality gate.</td><td>Phase 6</td></tr>
@@ -668,7 +668,7 @@ flowchart TB
       <div class="ph"><span class="ph-n">09</span><span class="ph-t">Observability</span><span class="ph-d">Prometheus, Grafana, Alertmanager, Blackbox. Alerts tested by inducing real failures.</span></div>
       <div class="ph"><span class="ph-n">10</span><span class="ph-t">Production readiness</span><span class="ph-d">DR drill, SLOs, load test, cost review. Reliability gaps revisited with operational experience behind them.</span></div>
     </div>
-    <p class="plate-note">Two orderings are deliberate and counter-intuitive. <strong>GitOps before Secrets:</strong> Argo CD lands right after the cluster so Vault itself is installed <em>by</em> Argo CD rather than adopted later — if Argo CD arrived after Vault, a Kubernetes Secret would get committed to git to make something work, and it would stay there. <strong>GitOps before CI:</strong> built first, Jenkins grows <code>kubectl</code> calls — exactly as the existing pipeline did.</p>
+    <p class="plate-note">Two orderings are deliberate and counter-intuitive. <strong>GitOps before Secrets:</strong> Argo CD lands right after the cluster so Vault itself is installed <em>by</em> Argo CD rather than adopted later. <strong>GitOps before CI:</strong> built first, Jenkins grows <code>kubectl</code> calls — exactly as the existing pipeline did.</p>
   </section>
 
   <section id="wa">
