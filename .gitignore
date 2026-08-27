@@ -38,3 +38,6 @@ Thumbs.db
 
 # Provider lock files belong to root modules only
 modules/**/.terraform.lock.hcl
+
+# Subagent working notes — task briefs, reports and the run ledger
+.superpowers/

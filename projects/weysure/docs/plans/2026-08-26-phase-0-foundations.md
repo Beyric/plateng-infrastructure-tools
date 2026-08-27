@@ -33,7 +33,7 @@ do not leave the literal placeholder in a command you run.
 
 | Placeholder | Where | What to supply |
 |---|---|---|
-| ~~budget alert email~~ | Task 8, Step 2 | **Supplied: `<your-alert-email>`** — already filled in |
+| ~~budget alert email~~ | Task 8, Step 2 | Supplied and used. Replaced with `<your-alert-email>` in tracked docs — this repository is public, and publishing a personal address invites spam. The real value lives only in the local payload file. |
 | SSO start URL | Task 7, Step 5 | The AWS access portal URL shown after enabling Identity Center in Step 3 |
 - **Repositories:**
   - `Beyric/plateng-infrastructure-tools` — Terraform + docs (this repo)
