@@ -2,7 +2,10 @@
 
 > **Status:** Design (pre-implementation). No AWS resources exist yet.
 > **Last updated:** 2026-08-26
+> **Presentable version:** **[Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)** — all ten diagrams rendered, for review and presentation.
 > **Companion documents:** [Design spec](../specs/2026-08-26-weysure-platform-design.md) · [Build checklist](../checklist/BUILD_CHECKLIST.md) · [Decision records](../../memory/DECISIONS.md)
+>
+> Source for the presentable version is [`blueprint.html`](./blueprint.html) in this directory. Edit it and republish to the same URL to update in place.
 
 All diagrams are Mermaid, rendered natively by GitHub. They are the **source of truth for
 intent**. When implementation diverges from a diagram, the diagram is updated in the same

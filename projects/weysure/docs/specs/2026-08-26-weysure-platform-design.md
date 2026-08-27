@@ -7,6 +7,7 @@
 | **Stage** | `brainstorm` → **`spec`** → `plan` → `implement` |
 | **Scope** | Greenfield production platform: AWS account → EKS → GitOps → CI → application delivery |
 | **Architecture diagrams** | [`docs/architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) |
+| **Presentable version** | [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae) |
 | **Build checklist** | [`docs/checklist/PLATFORM_BUILD_CHECKLIST.md`](../checklist/BUILD_CHECKLIST.md) |
 | **Decision records** | [`memory/DECISIONS.md`](../../memory/DECISIONS.md) |
 

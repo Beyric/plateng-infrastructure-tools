@@ -38,6 +38,7 @@ shared; product-specific configuration lives in `projects/<product>/`.
 
 | Document | Purpose |
 |---|---|
+| **[Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)** | **Presentable version** — every diagram rendered, for review and presentation |
 | [Architecture](projects/weysure/docs/architecture/ARCHITECTURE.md) | 10 diagrams — target state, network, CI/CD, identity, secrets, failure modes |
 | [Design spec](projects/weysure/docs/specs/2026-08-26-weysure-platform-design.md) | Full design, findings, phase plan, Well-Architected review |
 | [Build checklist](projects/weysure/docs/checklist/BUILD_CHECKLIST.md) | What is done, in progress, and ahead |

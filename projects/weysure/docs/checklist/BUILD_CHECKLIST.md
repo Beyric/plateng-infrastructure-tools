@@ -4,6 +4,8 @@
 > afterwards. An item is checked only when it is done **and verified**.
 >
 > **Last reconciled:** 2026-08-26 (revised: Karpenter, Cloudflare, SonarQube)
+>
+> **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
 ## Snapshot
 
