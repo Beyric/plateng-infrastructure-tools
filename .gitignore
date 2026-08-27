@@ -35,3 +35,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Provider lock files belong to root modules only
+modules/**/.terraform.lock.hcl
