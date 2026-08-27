@@ -16,15 +16,13 @@ terraform {
     bucket       = "beyric-tfstate-767397877316"
     key          = "weysure/infrastructure/terraform.tfstate"
     region       = "us-east-1"
-    profile      = "beyric-admin"
     encrypt      = true
     use_lockfile = true
   }
 }
 
 provider "aws" {
-  region  = var.region
-  profile = "beyric-admin"
+  region = var.region
 
   default_tags {
     tags = {
