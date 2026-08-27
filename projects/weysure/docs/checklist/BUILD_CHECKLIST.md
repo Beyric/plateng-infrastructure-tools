@@ -139,7 +139,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 *Exit criteria: application runs on RDS; restore drill completed.*
 
-> **The Supabase database is empty** (ADR-001 amendment). There is nothing to migrate — the 47
+> **The Supabase database is empty / throwaway** (ADR-001 amendment). There is nothing to migrate — the 47
 > Alembic revisions build the schema from scratch, which is the same path every fresh dev
 > environment already exercises. No dump, no cutover window, no rollback window.
 
