@@ -71,9 +71,9 @@ The state backend is already correctly hardened.
 
 | # | Severity | Finding | Evidence | Resolved in |
 |---|---|---|---|---|
-| ① | **Critical** | Plaintext database password in `terraform.tfvars` (`db_password = "<redacted>"`). Not yet leaked only because the directory is not a git repo. | `weysure-infrastructure/terraform.tfvars` | Phase 0 + 3 |
+| ① | **Critical** | Plaintext database password in `terraform.tfvars` (`db_password = "<redacted>"`). Not yet leaked only because the directory is not a git repo. | `weysure-infrastructure/terraform.tfvars` | Phase 0 + 5 |
 | ② | **Critical** | Infrastructure not under version control — no history, review, or rollback. | `git rev-parse` → *not a git repository* | Phase 0 |
-| ③ | **Critical** | Terraform provisions RDS in `us-east-1` while the app runs on Supabase in `eu-central-1`. `apply` as written creates a second, empty, `deletion_protection = true` database. | `.env` `DATABASE_URL`, `modules/rds/main.tf` | Phase 3 |
+| ③ | **Critical** | Terraform provisions RDS in `us-east-1` while the app runs on Supabase in `eu-central-1`. `apply` as written creates a second, empty, `deletion_protection = true` database. | `.env` `DATABASE_URL`, `modules/rds/main.tf` | Phase 5 |
 | ④ | **High** | EKS module sets no `access_config` and declares no `aws_eks_access_entry`. Only the creating principal can reach the cluster. Classic lockout. | `modules/eks/main.tf` | Phase 1 |
 | ⑤ | **High** | No EKS add-ons (`vpc-cni`, `coredns`, `kube-proxy`, `aws-ebs-csi-driver`) and no `aws_iam_openid_connect_provider`. Without EBS CSI **no PersistentVolume will bind** — Prometheus, Grafana, Vault, Redis all fail. Without IRSA no pod can assume an AWS role. | `modules/eks/main.tf` | Phase 1 |
 | ⑥ | Medium | Single NAT Gateway in `public[0]`, one private route table for both AZs. AZ-a failure removes egress for AZ-b nodes. | `modules/vpc/main.tf` | Accepted — Phase 10 |
@@ -253,12 +253,11 @@ completion, and a rehearsed rollback.
 | **9** | **Observability** | Prometheus, Grafana, Alertmanager, Blackbox; RED/USE dashboards; alerts routed and **tested by inducing failure** | — |
 | **10** | **Production readiness** | DR drill; runbooks complete; SLOs defined; load test; cost review (Karpenter, NAT instance, Graviton) | — |
 
-Two orderings are deliberate and counter-intuitive:
+Three orderings are deliberate and counter-intuitive:
 
 - **GitOps (2) before Secrets (3).** Argo CD lands immediately after the cluster so every
   later platform component — Vault included — is installed *by* Argo CD rather than adopted
-  into it after the fact. If Argo CD arrived later, a Kubernetes Secret would be committed to
-  git to get something working, and it would stay there. See ADR-014.
+  into it after the fact. See ADR-014.
 - **Secrets (3) before Ingress & TLS (4).** Vault needs no ingress to be configured
   (`kubectl port-forward` suffices), so placing it before Traefik means the Cloudflare API
   token required by external-dns and cert-manager is read from Vault rather than

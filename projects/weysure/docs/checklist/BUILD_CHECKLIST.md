@@ -88,6 +88,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Phase 2 — GitOps bootstrap ⚪
 
+- [ ] `gp3` StorageClass as default; **test PVC binds**
+- [ ] metrics-server
 - [ ] `plateng-gitops` skeleton: `bootstrap/`, `platform/`, `projects/weysure/`
 - [ ] Argo CD installed (documented manual bootstrap) and **self-managing**
 - [ ] App-of-apps root reconciling all platform components
@@ -120,8 +122,6 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 *Exit criteria: a real HTTPS URL serves a test workload.*
 
-- [ ] `gp3` StorageClass as default; **test PVC binds**
-- [ ] metrics-server
 - [ ] **Cloudflare zone for `beyrictech.com`**; delegate nameservers from Namecheap *(ADR-011)*
 - [ ] Cloudflare API token (scoped: Zone.DNS edit only) read **from Vault** via ExternalSecret — no hand-created Secret
 - [ ] Traefik via Helm, behind an NLB
