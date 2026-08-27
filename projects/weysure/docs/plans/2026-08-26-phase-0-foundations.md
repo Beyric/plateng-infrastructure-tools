@@ -22,6 +22,7 @@ fires before a surprise bill does. Every later phase depends on these guardrails
 - **No AI attribution** in any commit message, PR body, or issue body.
 - **Never commit to a default branch.** Work on `feature/*`; every change lands via pull request.
 - **Never print a secret value.** Key *names* may be listed; values never.
+- **Adebayo runs every state-mutating command himself** — see [`HUMAN_GATED_COMMANDS.md`](../../../../docs/conventions/HUMAN_GATED_COMMANDS.md). An agent prepares the command, the working directory, the expected output and the rollback, then **stops**. Steps marked **[HUMAN]** are handed over, never executed by an agent.
 - **Terraform state bucket:** `victor-terraform-state-2026`, key prefix `weysure/`, region `us-east-1`.
 - **Resource tagging:** every AWS resource carries `Project=weysure`, `Environment`, `ManagedBy=terraform`, `Repository=Beyric/plateng-infrastructure-tools`, applied through the provider's `default_tags`. Cost Explorer grouping depends on this.
 
@@ -32,7 +33,7 @@ do not leave the literal placeholder in a command you run.
 
 | Placeholder | Where | What to supply |
 |---|---|---|
-| `you@example.com` | Task 8, Step 2 | The address that should receive budget alerts |
+| ~~budget alert email~~ | Task 8, Step 2 | **Supplied: `<your-alert-email>`** — already filled in |
 | SSO start URL | Task 7, Step 5 | The AWS access portal URL shown after enabling Identity Center in Step 3 |
 - **Repositories:**
   - `Beyric/plateng-infrastructure-tools` — Terraform + docs (this repo)
@@ -559,7 +560,7 @@ be re-cloned. Do not do this while a pull request is open. Do not do it *instead
   there is no `.env` to leak.
 ```
 
-- [ ] **Step 3: Perform the rotation** *(human, in provider consoles)*
+- [ ] **Step 3: Perform the rotation** *([HUMAN] — provider consoles)*
 
 Follow the runbook's order of operations. Do not record any new value in git, in this plan, or
 in any chat transcript.
@@ -803,7 +804,25 @@ Phase 1 introduces it against the modules that will actually be applied.
 Record every warning. Warnings do not block this task — Phase 1 rewrites these modules for
 add-ons, IRSA, access entries and Karpenter — but each must be triaged then.
 
-- [ ] **Step 14: Commit**
+- [ ] **Step 14: Archive the legacy directory — there must be exactly one copy** *([HUMAN])*
+
+Two copies of infrastructure code is how the wrong one gets applied. Once the migration is
+verified, the source stops being a working directory.
+
+**Where:** `~/Documents/plateng-infra`
+
+```bash
+mv weysure-infrastructure weysure-infrastructure.ARCHIVED-2026-08-26
+```
+
+**Expect:** the directory is renamed. From this point,
+`plateng-infrastructure-tools/projects/weysure/terraform/` is the **only** Weysure Terraform.
+
+**If it goes wrong:** `mv` back. The archive still contains `terraform.tfvars` with the
+plaintext password — it is outside any git repository so it cannot be committed, but delete the
+whole archive once Phase 1 has applied successfully from the new location.
+
+- [ ] **Step 15: Commit**
 
 ```bash
 cd ~/Documents/plateng-infra/plateng-infrastructure-tools
@@ -1210,7 +1229,26 @@ aws iam list-access-keys --user-name s_user --profile personal \
 Expected: an `arn:aws:iam::767397877316:user/s_user` ARN; `AWSOrganizationsNotInUseException`;
 empty instance list; `AKIA<redacted>  Active`.
 
-- [ ] **Step 2: Create an AWS Organization** *(state change — requires approval)*
+- [ ] **Step 2: Find every other consumer of the `personal` profile**
+
+Deleting the access key breaks **anything** still using it.
+
+```bash
+grep -rln 'profile.*=.*"personal"' ~/Documents/plateng-infra ~/Documents/dev 2>/dev/null | grep -v node_modules
+```
+
+Verified consumers today:
+
+| Path | Status |
+|---|---|
+| `plateng-infra/weysure-infrastructure/{versions,outputs}.tf` | archived in Task 4 — no action |
+| `plateng-infra/luran-infrastructure/{versions,outputs}.tf` | **live — repoint it or it breaks** |
+
+Luran shares the same AWS account and the same state bucket, so the same SSO profile serves it.
+**Decide before Step 12:** repoint Luran in the same pass, or accept that its Terraform stops
+working until you do. Record the choice in the commit message.
+
+- [ ] **Step 3: Create an AWS Organization** *(state change — [HUMAN])*
 
 IAM Identity Center requires AWS Organizations. This account is standalone, so the organization
 must be created first. It is free, and with a single account it adds no operational overhead.
@@ -1228,7 +1266,7 @@ aws organizations describe-organization --profile personal \
 
 Expected: an organization id, `MasterAccount` `767397877316`, `FeatureSet` `ALL`.
 
-- [ ] **Step 3: Enable IAM Identity Center** *(console only)*
+- [ ] **Step 4: Enable IAM Identity Center** *(console only — [HUMAN])*
 
 1. Open the AWS console → **IAM Identity Center** → **Enable**.
 2. Choose region **`us-east-1`** — it must match ADR-002; the Identity Center instance region
@@ -1241,7 +1279,7 @@ Expected: an organization id, `MasterAccount` `767397877316`, `FeatureSet` `ALL`
    `adebayo`, permission set `PlatformAdmin` → **Submit**.
 6. Copy the **AWS access portal URL** from the dashboard — the next step needs it.
 
-- [ ] **Step 4: Verify Identity Center is live**
+- [ ] **Step 5: Verify Identity Center is live**
 
 ```bash
 aws sso-admin list-instances --profile personal --region us-east-1 \
@@ -1250,7 +1288,7 @@ aws sso-admin list-instances --profile personal --region us-east-1 \
 
 Expected: one instance. If still empty, enablement did not complete — do not continue.
 
-- [ ] **Step 5: Configure the SSO profile**
+- [ ] **Step 6: Configure the SSO profile** *([HUMAN])*
 
 ```bash
 aws configure sso --profile weysure-sso
@@ -1268,7 +1306,7 @@ Answer:
 | CLI default client Region | `us-east-1` |
 | CLI default output format | `json` |
 
-- [ ] **Step 6: Verify the SSO profile authenticates as a role, not a user**
+- [ ] **Step 7: Verify the SSO profile authenticates as a role, not a user**
 
 ```bash
 aws sso login --profile weysure-sso
@@ -1279,7 +1317,7 @@ Expected: an ARN of the form
 `arn:aws:sts::767397877316:assumed-role/AWSReservedSSO_PlatformAdmin_*/adebayo`.
 It must contain `assumed-role`, not `user/`.
 
-- [ ] **Step 7: Verify the profile can reach the Terraform state bucket**
+- [ ] **Step 8: Verify the profile can reach the Terraform state bucket**
 
 ```bash
 aws s3api head-bucket --bucket victor-terraform-state-2026 --profile weysure-sso && echo "state bucket reachable ✓"
@@ -1288,7 +1326,7 @@ aws s3api head-bucket --bucket victor-terraform-state-2026 --profile weysure-sso
 Expected: `state bucket reachable ✓`. If this fails, do **not** delete the access key — you would
 lose access to your own state.
 
-- [ ] **Step 8: Point Terraform at the SSO profile**
+- [ ] **Step 9: Point Terraform at the SSO profile**
 
 In `projects/weysure/terraform/versions.tf`, change both occurrences of
 `profile = "personal"` to `profile = "weysure-sso"` — one in the `backend "s3"` block, one in
@@ -1304,7 +1342,7 @@ terraform init -backend=false && terraform validate
 
 Expected: both lines read `profile = "weysure-sso"`, and `Success! The configuration is valid.`
 
-- [ ] **Step 9: Deactivate the access key before deleting it**
+- [ ] **Step 10: Deactivate the access key before deleting it** *([HUMAN])*
 
 Deactivate first. If something breaks, reactivation is instant; deletion is irreversible.
 
@@ -1317,12 +1355,12 @@ aws iam list-access-keys --user-name s_user --profile weysure-sso \
 
 Expected: `AKIA<redacted>  Inactive`.
 
-- [ ] **Step 10: Work normally for at least one full session**
+- [ ] **Step 11: Work normally for at least one full session**
 
 Use `--profile weysure-sso` for every AWS command for the rest of Phase 0. If nothing breaks,
 proceed. If something does, reactivate with `--status Active` and investigate.
 
-- [ ] **Step 11: Delete the access key** *(irreversible — requires approval)*
+- [ ] **Step 12: Delete the access key** *(irreversible — [HUMAN])*
 
 ```bash
 aws iam delete-access-key --user-name s_user --access-key-id AKIA<redacted> --profile weysure-sso
@@ -1331,7 +1369,7 @@ aws iam list-access-keys --user-name s_user --profile weysure-sso --query 'Acces
 
 Expected: empty output — no access keys remain.
 
-- [ ] **Step 12: Remove the stale local profile**
+- [ ] **Step 13: Remove the stale local profile**
 
 ```bash
 aws configure list-profiles
@@ -1340,7 +1378,7 @@ aws configure list-profiles
 Leave `personal` in place if other projects use it; its key is now deleted, so it is inert.
 Note in the commit message which choice you made.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
 cd ~/Documents/plateng-infra/plateng-infrastructure-tools
@@ -1377,9 +1415,9 @@ aws budgets describe-budgets --account-id 767397877316 --profile weysure-sso \
 
 Expected: empty output, or a `NotFound` error.
 
-- [ ] **Step 2: Create the monthly budget with three alert thresholds**
+- [ ] **Step 2: Create the monthly budget with three alert thresholds** *([HUMAN])*
 
-Replace `you@example.com` with your real address in both places.
+The alert address is already filled in below.
 
 ```bash
 cat > /tmp/budget.json <<'JSON'
@@ -1395,15 +1433,15 @@ cat > /tmp/notifications.json <<'JSON'
 [
   {
     "Notification": { "NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "Threshold": 50, "ThresholdType": "PERCENTAGE" },
-    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "you@example.com" } ]
+    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "<your-alert-email>" } ]
   },
   {
     "Notification": { "NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "Threshold": 80, "ThresholdType": "PERCENTAGE" },
-    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "you@example.com" } ]
+    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "<your-alert-email>" } ]
   },
   {
     "Notification": { "NotificationType": "FORECASTED", "ComparisonOperator": "GREATER_THAN", "Threshold": 100, "ThresholdType": "PERCENTAGE" },
-    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "you@example.com" } ]
+    "Subscribers": [ { "SubscriptionType": "EMAIL", "Address": "<your-alert-email>" } ]
   }
 ]
 JSON
@@ -1454,7 +1492,7 @@ grep -n 'use_lockfile' ~/Documents/plateng-infra/plateng-infrastructure-tools/pr
 
 Expected: `Terraform v1.15.8` (>= 1.10) and `use_lockfile = true`.
 
-- [ ] **Step 6: Restrict the state bucket to the PlatformAdmin role**
+- [ ] **Step 6: Restrict the state bucket to the PlatformAdmin role** *([HUMAN])*
 
 State contains resource identifiers, and — for resources that do not support managed
 passwords — occasionally sensitive values. Only the platform role should read it.
