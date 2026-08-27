@@ -121,6 +121,19 @@ project (`SUPABASE_URL: https://test.supabase.co`), not production:
 `ci.yml` was later corrected to `${{ secrets.CI_* }}` in `e25b096` — the right fix going
 forward, but the literals remain in history.
 
+### Finding ⑱ — RDS final snapshot name will collide on a second create
+
+`modules/rds/main.tf` sets a static `final_snapshot_identifier = "${var.project}-final-snapshot"`.
+Snapshot identifiers are unique per account per region, so a destroy-then-recreate cycle fails at
+destroy time: the name is already taken by the snapshot from the previous destroy.
+
+Not urgent — it only bites on the second teardown — but that is exactly when it hurts most, since
+it blocks a `destroy` you are probably running under time pressure. Fix in **Phase 5** by
+suffixing with a `random_id` that has `keepers`, rather than `timestamp()`, which would cause a
+perpetual plan diff.
+
+Found by review of Task 4. Not previously tracked.
+
 ### Triaged as NOT exposures
 
 Checking these was the point of triage; scanning without it produces noise that gets ignored.
