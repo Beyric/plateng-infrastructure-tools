@@ -86,43 +86,18 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] `kubectx` / `kubens` contexts configured; k9s verified
 - [ ] SOP · diagram · Well-Architected delta · **rollback plan rehearsed**
 
-## Phase 2 — Cluster baseline ⚪
+## Phase 2 — GitOps bootstrap ⚪
 
-*Exit criteria: a real HTTPS URL serves a test workload.*
+- [ ] `plateng-gitops` skeleton: `bootstrap/`, `platform/`, `projects/weysure/`
+- [ ] Argo CD installed (documented manual bootstrap) and **self-managing**
+- [ ] App-of-apps root reconciling all platform components
+- [ ] Argo CD projects + RBAC separating stage and prod
+- [ ] Drift detection set to **alert, not auto-heal** initially
+- [ ] **`git revert` rollback demonstrated end to end**
+- [ ] `argocd` CLI installed locally
+- [ ] SOP · runbook `ARGOCD_FAILURE.md` · workflow `GITOPS_WORKFLOW.md` · diagram
 
-- [ ] `gp3` StorageClass as default; **test PVC binds**
-- [ ] metrics-server
-- [ ] **Cloudflare zone for `beyrictech.com`**; delegate nameservers from Namecheap *(ADR-011)*
-- [ ] Cloudflare API token (scoped: Zone.DNS edit only) → Vault
-- [ ] Traefik via Helm, behind an NLB
-- [ ] **NLB security group restricted to Cloudflare published IP ranges**
-- [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
-- [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
-- [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
-- [ ] external-dns with the **Cloudflare provider**
-- [ ] Cloudflare TLS mode set to **Full (strict)** — never Flexible
-- [ ] DNS records: `weysure`, `weysure-api`, `weysure-stage`, `weysure-api-stage`
-- [ ] End-to-end: test workload reachable over HTTPS with a valid certificate
-- [ ] SOP · diagram · Well-Architected delta
-
-## Phase 3 — Data layer ⚪
-
-*Exit criteria: application runs on RDS; restore drill completed.*
-
-- [ ] RDS with `manage_master_user_password = true` *(ADR-010)*
-- [ ] Automated backups, PITR, 7-day retention
-- [ ] Redis deployed with a PVC
-- [ ] **Migration rehearsal** — dump, restore, verify against a non-prod target
-- [ ] Row-count and checksum verification per table
-- [ ] Alembic head parity confirmed against the live database
-- [ ] Maintenance window agreed; write freeze procedure documented
-- [ ] Cutover executed; `DATABASE_URL` flipped
-- [ ] Supabase retained **read-only** for rollback
-- [ ] **Restore drill from PITR — timed, RTO recorded**
-- [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
-- [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
-
-## Phase 4 — Secrets ⚪
+## Phase 3 — Secrets ⚪
 
 *Exit criteria: application authenticates to Postgres with 1-hour Vault-issued credentials.*
 
@@ -141,16 +116,41 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Config/secret split: non-secret `.env` keys → ConfigMap in git
 - [ ] SOP · runbooks `VAULT_FAILURE.md`, `SECRETS_ROTATION.md` · diagram
 
-## Phase 5 — GitOps ⚪
+## Phase 4 — Ingress & TLS ⚪
 
-- [ ] `plateng-gitops` skeleton: `bootstrap/`, `platform/`, `projects/weysure/`
-- [ ] Argo CD installed (documented manual bootstrap) and **self-managing**
-- [ ] App-of-apps root reconciling all platform components
-- [ ] Argo CD projects + RBAC separating stage and prod
-- [ ] Drift detection set to **alert, not auto-heal** initially
-- [ ] **`git revert` rollback demonstrated end to end**
-- [ ] `argocd` CLI installed locally
-- [ ] SOP · runbook `ARGOCD_FAILURE.md` · workflow `GITOPS_WORKFLOW.md` · diagram
+*Exit criteria: a real HTTPS URL serves a test workload.*
+
+- [ ] `gp3` StorageClass as default; **test PVC binds**
+- [ ] metrics-server
+- [ ] **Cloudflare zone for `beyrictech.com`**; delegate nameservers from Namecheap *(ADR-011)*
+- [ ] Cloudflare API token (scoped: Zone.DNS edit only) read **from Vault** via ExternalSecret — no hand-created Secret
+- [ ] Traefik via Helm, behind an NLB
+- [ ] **NLB security group restricted to Cloudflare published IP ranges**
+- [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
+- [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
+- [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
+- [ ] external-dns with the **Cloudflare provider**
+- [ ] Cloudflare TLS mode set to **Full (strict)** — never Flexible
+- [ ] DNS records: `weysure`, `weysure-api`, `weysure-stage`, `weysure-api-stage`
+- [ ] End-to-end: test workload reachable over HTTPS with a valid certificate
+- [ ] SOP · diagram · Well-Architected delta
+
+## Phase 5 — Data layer ⚪
+
+*Exit criteria: application runs on RDS; restore drill completed.*
+
+- [ ] RDS with `manage_master_user_password = true` *(ADR-010)*
+- [ ] Automated backups, PITR, 7-day retention
+- [ ] Redis deployed with a PVC
+- [ ] **Migration rehearsal** — dump, restore, verify against a non-prod target
+- [ ] Row-count and checksum verification per table
+- [ ] Alembic head parity confirmed against the live database
+- [ ] Maintenance window agreed; write freeze procedure documented
+- [ ] Cutover executed; `DATABASE_URL` flipped
+- [ ] Supabase retained **read-only** for rollback
+- [ ] **Restore drill from PITR — timed, RTO recorded**
+- [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
+- [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
 
 ## Phase 6 — CI ⚪
 

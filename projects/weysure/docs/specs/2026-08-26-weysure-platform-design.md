@@ -243,10 +243,10 @@ completion, and a rehearsed rollback.
 |---|---|---|---|
 | **0** | **Foundations & guardrails** | Both platform repos initialised with branch protection; Terraform migrated into `plateng-infrastructure-tools`; secrets purged; Gitleaks pre-commit active; IAM Identity Center live and `s_user` keys deleted; remote state verified | **$0** |
 | **1** | **Network & cluster** | VPC applied; EKS 1.31 reachable; **add-ons installed, IRSA provider created, access entries declared**; `system` node group Ready; **Karpenter installed with `EC2NodeClass`, `NodePool` and SQS interruption queue**; a test deployment triggers Karpenter to provision and then consolidate a node | first spend |
-| **2** | **Cluster baseline** | StorageClass binds a test PVC; metrics-server serving; Namecheap NS delegated to Cloudflare; Traefik reachable via NLB; cert-manager issuing a real Let's Encrypt cert via Cloudflare DNS-01; external-dns writing Cloudflare records; NLB security group restricted to Cloudflare IP ranges | + LB |
-| **3** | **Data layer** | RDS applied with managed master password; Supabase→RDS migration **rehearsed**, verified, and cut over; Redis running; **restore drill completed** | + DB |
-| **4** | **Secrets** | Vault initialised with KMS auto-unseal; policies and Kubernetes auth configured; database engine issuing 1-hour credentials; ESO syncing; Reloader restarting on change; Raft snapshots to S3 | — |
-| **5** | **GitOps** | Argo CD self-managing; app-of-apps reconciling all platform components; drift detection alerting; `git revert` rollback demonstrated | — |
+| **2** | **GitOps bootstrap** | Default `gp3` StorageClass binds a test PVC; metrics-server serving; Argo CD installed via the one documented manual bootstrap and **self-managing**; app-of-apps root reconciling | — |
+| **3** | **Secrets** | Vault deployed by Argo CD, initialised once, KMS auto-unseal working; recovery keys in AWS Secrets Manager; root token revoked; KV v2 populated; ESO syncing; Reloader verified by rotating a secret | — |
+| **4** | **Ingress & TLS** | Namecheap NS delegated to Cloudflare; Traefik behind an NLB; **NLB security group restricted to Cloudflare IP ranges**; cert-manager issuing a real Let's Encrypt certificate via Cloudflare DNS-01 using a **token read from Vault**; external-dns writing records; Traefik honouring `CF-Connecting-IP` | + LB |
+| **5** | **Data layer** | RDS applied with `manage_master_user_password`; Supabase→RDS migration rehearsed, verified and cut over; Redis running; **Vault database engine issuing 1-hour credentials**; restore drill timed | + DB |
 | **6** | **CI** | Jenkins on ephemeral agents; **SonarQube self-hosted with its PostgreSQL and `vm.max_map_count` handled**; Gitleaks, tests, Trivy all gating; image pushed via IRSA; tag commit to `plateng-gitops`; **no cluster credentials anywhere** | — |
 | **7** | **Application delivery** | Helm charts for API and web; probes, HPA, PDB, resource limits; migrations as an Argo CD PreSync hook (Finding ⑨); frontend Dockerfile with `output: "standalone"` | — |
 | **8** | **Policy** | Kyverno enforcing baseline policies; default-deny NetworkPolicies; ResourceQuota per namespace | — |
@@ -255,10 +255,15 @@ completion, and a rehearsed rollback.
 
 Two orderings are deliberate and counter-intuitive:
 
-- **Secrets (4) before GitOps (5).** If Argo CD arrives first, a Kubernetes Secret will be
-  committed to git to get something working, and it will stay there. Vault first makes the
-  wrong thing impossible.
-- **GitOps (5) before CI (6).** Jenkins' job is to produce an artifact and update a git
+- **GitOps (2) before Secrets (3).** Argo CD lands immediately after the cluster so every
+  later platform component — Vault included — is installed *by* Argo CD rather than adopted
+  into it after the fact. If Argo CD arrived later, a Kubernetes Secret would be committed to
+  git to get something working, and it would stay there. See ADR-014.
+- **Secrets (3) before Ingress & TLS (4).** Vault needs no ingress to be configured
+  (`kubectl port-forward` suffices), so placing it before Traefik means the Cloudflare API
+  token required by external-dns and cert-manager is read from Vault rather than
+  hand-created. See ADR-014.
+- **GitOps (2) before CI (6).** Jenkins' job is to produce an artifact and update a git
   reference. Built first, it grows `kubectl` calls — exactly as the current `Jenkinsfile` did.
 
 ---

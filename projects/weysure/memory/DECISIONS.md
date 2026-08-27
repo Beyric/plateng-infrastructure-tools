@@ -327,3 +327,28 @@ memory and cannot host both the application and SonarQube, and SonarQube's data 
 history — losing it costs re-analysis, not money.
 
 **Revisit if:** cluster capacity becomes constrained, or SonarCloud's pricing changes.
+
+---
+
+## ADR-014 — Phase order: GitOps and Secrets before Ingress
+
+**Date:** 2026-08-26 · **Status:** Accepted · **Corrects** the phase plan in the original spec
+
+**Context.** The original phase plan installed Traefik, cert-manager and external-dns in Phase 2
+but Argo CD in Phase 5, contradicting the bootstrap ordering in ARCHITECTURE.md diagram 7. Left
+alone it would have meant installing three platform components imperatively with `helm install`
+and retrofitting them into Argo CD three phases later.
+
+**Decision.** Argo CD lands immediately after the cluster (Phase 2), Vault and ESO next
+(Phase 3), ingress and TLS after that (Phase 4), data layer fifth.
+
+**Consequences.** Every platform component after Phase 2 is installed *by* Argo CD, so no
+component is ever adopted retroactively. Because Vault is usable through `kubectl port-forward`
+and needs no ingress, placing it before Traefik means the Cloudflare API token required by
+external-dns and cert-manager is read from Vault rather than hand-created — reducing the count
+of manual bootstrap secrets from three to one.
+
+The one remaining hand-created secret is Argo CD's git credential, which is irreducible: Vault
+is installed by Argo CD, so it cannot supply the credential Argo CD needs to find Vault.
+
+**Revisit if:** a future component genuinely requires ingress before secrets are available.
