@@ -28,9 +28,19 @@ local `users` table, JWTs signed with the application's own `SECRET_KEY`.
 (b) RDS for staging only, Supabase for production — pays for both.
 
 **Consequences.** Full AWS ownership; enables Vault dynamic database credentials, which
-Supabase cannot provide. Adds a rehearsed data migration with a maintenance window. Risk is
-bounded because no passwords are stranded in a managed `auth` schema — the largest failure
-mode of this migration class does not apply.
+Supabase cannot provide.
+
+> **Amended 2026-08-27 — the Supabase database is empty.** Confirmed with Adebayo: there is no
+> data to move and nothing outside the system has acted on any row. This collapses the
+> "migration" into a provisioning step: create RDS, run `alembic upgrade head` (47 revisions),
+> point `DATABASE_URL` at it. No `pg_dump`, no `pg_restore`, no checksum verification, no
+> maintenance window, no dual-running, no rollback window.
+>
+> This is the cheapest moment this migration will ever have. Every row added from here makes it
+> more expensive, and the cost is not linear — it is the difference between a schema build and
+> a cutover with an audit trail. The same move after launch would need a write freeze, verified
+> row counts, and a rehearsed rollback, because an escrow ledger's counterparties keep their own
+> records and those survive dropping your tables.
 
 **Revisit if:** operational burden of self-managed Postgres exceeds the benefit.
 
@@ -352,3 +362,64 @@ The one remaining hand-created secret is Argo CD's git credential, which is irre
 is installed by Argo CD, so it cannot supply the credential Argo CD needs to find Vault.
 
 **Revisit if:** a future component genuinely requires ingress before secrets are available.
+
+---
+
+## ADR-015 — Rename the Terraform state bucket to `beyric-tfstate-767397877316`
+
+**Date:** 2026-08-27 · **Status:** Accepted · **Supersedes** the bucket named in ADR-010's context
+
+**Context.** State lived in `victor-terraform-state-2026`, which already served three projects
+via key prefixes (`devops-lab/`, `luran/`, `weysure/`). Two weaknesses: `victor-` is
+personally scoped for what is now organisation infrastructure, and `2026` encodes nothing —
+it reads as stale from January 2027 onward and invites "is there a 2027 bucket?" forever.
+
+**Decision.** `beyric-tfstate-767397877316`. Organisation prefix, purpose, account id.
+
+**Alternatives.** Keep the existing name (zero work, permanent ambiguity). A random suffix
+(unique, but tells a reader nothing).
+
+**Consequences.** S3 bucket names are globally unique across **every AWS customer**, not just
+your account — which is why suffixes exist at all. The account id guarantees availability and
+documents ownership in the name, so anyone reading a backend block knows which account holds
+the state without opening a console.
+
+**The timing is the whole argument.** The old bucket contained exactly one state file
+describing **zero** resources — a lab VPC applied and then destroyed, serial 9. Neither Luran
+nor Weysure had ever been applied. So this is a create, not a migration: no
+`terraform init -migrate-state`, no state surgery, no risk. That property expires the moment
+Phase 1 applies, after which state becomes the only record mapping real infrastructure to
+configuration, and moving it becomes a careful operation rather than a rename.
+
+The old bucket is left in place, holding a zero-resource lab state. Delete it once Phase 1 has
+applied successfully against the new one.
+
+**Revisit if:** never, realistically — but any rename after Phase 1 requires
+`terraform init -migrate-state` and a verified state pull first.
+
+---
+
+## ADR-016 — SSO profiles are named for the account, not the project
+
+**Date:** 2026-08-27 · **Status:** Accepted · **Corrects** an error in the Phase 0 plan
+
+**Context.** The plan originally specified an AWS CLI profile named `weysure-sso`. Adebayo
+challenged it: *"what if I want to use it for another project? I'll have to create another
+SSO?"* He was right, and the naming was wrong.
+
+**Decision.** Name profiles `<organisation>-<permission-set>`. This one is **`beyric-admin`**.
+
+**Why the original was wrong.** An SSO profile authenticates to an **AWS account** through a
+**permission set**. It is not project-scoped. One profile serves every project in that account
+— Weysure, Luran, and anything built later. Naming it after a project implies a profile per
+project, which would be both redundant and misleading.
+
+**Consequences.** A second AWS account becomes `<that-org>-admin`, and every command states
+which account it touches. The `[sso-session]` block is reusable: one session per Identity
+Center instance, with multiple `[profile]` blocks selecting different accounts and roles
+beneath it — which is the actual scaling model, and the shape the config already has.
+
+**Related, deferred.** The permission set in use is the AWS-managed `AdministratorAccess`
+(`*:*`) with a 1-hour session duration. The session duration is the control that matters for
+ADR-009 and it is correct. Narrowing the permissions themselves belongs to the Phase 10
+least-privilege review, not here.

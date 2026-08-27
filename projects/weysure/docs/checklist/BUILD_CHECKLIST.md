@@ -57,7 +57,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] AWS Budget at $250/mo with alerts at 50 / 80 / 100%
   - [ ] Cost Explorer enabled; tagging convention agreed
 - [ ] **State backend**
-  - [x] Bucket `victor-terraform-state-2026` — versioning ✅, public access blocked ✅
+  - [x] Bucket `beyric-tfstate-767397877316` — versioning ✅, public access blocked ✅
   - [ ] Confirm `use_lockfile` behaviour on Terraform 1.15
   - [ ] Restrict bucket policy to the `PlatformAdmin` role
 - [ ] SOP written · diagram updated · Well-Architected delta recorded
@@ -139,16 +139,19 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 *Exit criteria: application runs on RDS; restore drill completed.*
 
+> **The Supabase database is empty** (ADR-001 amendment). There is nothing to migrate — the 47
+> Alembic revisions build the schema from scratch, which is the same path every fresh dev
+> environment already exercises. No dump, no cutover window, no rollback window.
+
 - [ ] RDS with `manage_master_user_password = true` *(ADR-010)*
 - [ ] Automated backups, PITR, 7-day retention
 - [ ] Redis deployed with a PVC
-- [ ] **Migration rehearsal** — dump, restore, verify against a non-prod target
-- [ ] Row-count and checksum verification per table
-- [ ] Alembic head parity confirmed against the live database
-- [ ] Maintenance window agreed; write freeze procedure documented
-- [ ] Cutover executed; `DATABASE_URL` flipped
-- [ ] Supabase retained **read-only** for rollback
+- [ ] **Schema build** — `alembic upgrade head` against the empty RDS instance (47 revisions)
+- [ ] Verify every table, index and constraint the models expect actually exists
+- [ ] `DATABASE_URL` pointed at RDS, credentials issued by Vault *(ADR-007)*
+- [ ] Application smoke test against RDS
 - [ ] **Restore drill from PITR — timed, RTO recorded**
+- [ ] Supabase project decommissioned once RDS is observed healthy
 - [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
 - [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
 
