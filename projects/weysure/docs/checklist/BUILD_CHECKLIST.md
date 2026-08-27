@@ -34,18 +34,18 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `Beyric/plateng-infrastructure-tools` created
   - [x] `Beyric/plateng-gitops` created
   - [x] Design spec, architecture diagrams, ADRs, and this checklist committed
-  - [ ] `.gitignore` covering `*.tfvars`, `*.tfstate*`, `.terraform/`, `.env*`, `*.pem`
+  - [x] `.gitignore` covering `*.tfvars`, `*.tfstate*`, `.terraform/`, `.env*`, `*.pem`
   - [ ] Initialise `plateng-gitops` with its directory skeleton
   - [ ] Branch protection on all four repos — require PR review, block force-push *(Finding ⑫)*
   - [ ] `CODEOWNERS` on both platform repos
 - [ ] **Secret hygiene** *(Finding ①)*
-  - [ ] Remove `db_password` from `terraform.tfvars` before any commit
+  - [x] Remove `db_password` from `terraform.tfvars` before any commit
   - [x] Gitleaks pre-commit hook installed locally
   - [x] Gitleaks scan across all four repos, including full history
 - [ ] **Terraform migration** *(Finding ②)*
-  - [ ] Move `~/Documents/plateng-infra/weysure-infrastructure` into `projects/weysure/`
-  - [ ] Extract shared modules to `modules/`
-  - [ ] `terraform fmt` + `terraform validate` clean
+  - [x] Move `~/Documents/plateng-infra/weysure-infrastructure` into `projects/weysure/`
+  - [x] Extract shared modules to `modules/`
+  - [x] `terraform fmt` + `terraform validate` clean
   - [ ] `tflint` and `checkov` (or `tfsec`) baseline recorded
 - [ ] **AWS identity** *(Finding ⑭ / ADR-009)*
   - [ ] Enable IAM Identity Center

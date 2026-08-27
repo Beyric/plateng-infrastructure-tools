@@ -426,3 +426,42 @@ beneath it — which is the actual scaling model, and the shape the config alrea
 (`*:*`) with a 1-hour session duration. The session duration is the control that matters for
 ADR-009 and it is correct. Narrowing the permissions themselves belongs to the Phase 10
 least-privilege review, not here.
+
+---
+
+## ADR-017 — AWS credentials come from the environment; no `profile` in Terraform
+
+**Date:** 2026-08-27 · **Status:** Accepted · **Refines** ADR-016
+
+**Context.** The migrated configuration carried `profile = "personal"` from the original code.
+Task 4 renamed it to `beyric-admin` in the backend and provider blocks, and review caught that
+renaming it was solving the wrong problem.
+
+**Decision.** No `profile` argument in any Terraform file. Credentials resolve through the
+standard AWS credential chain.
+
+**Why the rename was insufficient.** A hardcoded `profile` requires every machine that ever runs
+the configuration to have a named profile spelled exactly that way in `~/.aws/config`. That is
+true of one laptop and false of everything else:
+
+| Where | How credentials arrive | Works with a hardcoded profile? |
+|---|---|---|
+| Laptop | `AWS_PROFILE=beyric-admin` + `aws sso login` | Yes |
+| **Jenkins (Phase 6)** | **IRSA — ServiceAccount assumes an IAM role** | **No — there is no `~/.aws/config`** |
+| Break-glass | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | No — the profile takes precedence |
+| A second engineer | their own profile naming | Only if they match the name exactly |
+
+**Consequences.** The configuration becomes identical in every context, and the credential chain
+resolves each one. This is a precondition for ADR-005 — Jenkins holding no static credentials —
+so the hardcode would have surfaced as a Phase 6 failure with a confusing error, months after it
+was introduced.
+
+The cost is one piece of required environment: `AWS_PROFILE` must be exported before
+`terraform init`. Documented in `projects/weysure/terraform/README.md`. Forgetting it produces a
+clear "no valid credential sources" error rather than silent misbehaviour, which is the right
+failure mode.
+
+**General principle.** Configuration should name *what* it needs, not *where a particular
+machine keeps it*. A `profile` is a local lookup key, not a property of the infrastructure.
+
+**Revisit if:** never — this is the standard pattern.
