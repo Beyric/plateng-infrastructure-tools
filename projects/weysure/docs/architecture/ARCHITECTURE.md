@@ -2,7 +2,7 @@
 
 > **Status:** Design (pre-implementation). No AWS resources exist yet.
 > **Last updated:** 2026-08-26
-> **Companion documents:** [Design spec](../superpowers/specs/2026-08-26-weysure-platform-design.md) · [Build checklist](../checklist/PLATFORM_BUILD_CHECKLIST.md) · [Decision records](../../memory/DECISIONS.md)
+> **Companion documents:** [Design spec](../specs/2026-08-26-weysure-platform-design.md) · [Build checklist](../checklist/BUILD_CHECKLIST.md) · [Decision records](../../memory/DECISIONS.md)
 
 All diagrams are Mermaid, rendered natively by GitHub. They are the **source of truth for
 intent**. When implementation diverges from a diagram, the diagram is updated in the same
@@ -38,7 +38,7 @@ flowchart TB
     subgraph CIGATES["CI quality gates"]
         direction LR
         GL["Gitleaks<br/>secret scanning"]
-        SQ["SonarQube<br/>quality gate"]
+        SQ["SonarQube<br/>self-hosted in-cluster"]
         TST["pytest / vitest<br/>+ coverage"]
         TRV["Trivy<br/>image CVE scan"]
     end
@@ -53,6 +53,7 @@ flowchart TB
     subgraph EKS["Amazon EKS cluster — us-east-1"]
         ARGO
         subgraph PLATFORM["Platform namespaces"]
+            KARP["Karpenter<br/>node autoprovisioner"]
             TRAEFIK["Traefik<br/>ingress"]
             CM["cert-manager<br/>TLS"]
             EDNS["external-dns"]
@@ -78,13 +79,14 @@ flowchart TB
     ARGO -->|"reconciles"| PLATFORM
     ARGO -->|"reconciles"| APPNS
     ARGO -->|"reconciles"| OBS
+    KARP -->|"provisions nodes<br/>on pending pods"| EKS
     ECR -.->|"image pull"| APPNS
 
     RDS[("Amazon RDS<br/>PostgreSQL")]
     KMS["AWS KMS"]
     ASM["AWS Secrets Manager"]
-    R53["Route 53"]
-    CF["CloudFront"]
+    CFDNS["Cloudflare DNS<br/>beyrictech.com"]
+    CFCDN["Cloudflare CDN + WAF<br/>free tier · Lagos PoP"]
 
     API --> REDIS
     VAULT -->|"issues 1h creds"| API
@@ -92,10 +94,10 @@ flowchart TB
     API --> RDS
     KMS -->|"auto-unseal"| VAULT
     ASM -.->|"break-glass"| VAULT
-    EDNS --> R53
-    CM --> R53
+    EDNS --> CFDNS
+    CM -->|"DNS-01 challenge"| CFDNS
 
-    USER["Users — West Africa"] --> CF --> NLB["Network<br/>Load Balancer"] --> TRAEFIK
+    USER["Users — West Africa"] --> CFCDN --> NLB["Network<br/>Load Balancer"] --> TRAEFIK
     TRAEFIK --> API
     TRAEFIK --> WEB
 
@@ -112,7 +114,7 @@ flowchart TB
 | Component | Why deferred | Revisit trigger |
 |---|---|---|
 | **Linkerd** | ~50m CPU / ~50 MiB sidecar on *every* pod ≈ 40% of the on-demand node | Node capacity increase, or first service-to-service traffic worth encrypting |
-| **Karpenter** | Learn node groups, taints, and the Cluster Autoscaler first | Phase 10 cost review |
+| **CloudFront** | Superseded — Cloudflare's free plan gives an equal or better edge at zero cost | Only if leaving Cloudflare |
 | **Multi-AZ NAT** | +$33/mo | Budget increase, or first AZ-related incident |
 | **Multi-AZ RDS** | Doubles instance cost | First paying-customer SLA |
 | **Second cluster** | +$73/mo control plane + nodes | First time stage causes a prod incident |
@@ -130,12 +132,12 @@ flowchart TB
             PUBA["Public subnet<br/>10.0.1.0/24<br/>kubernetes.io/role/elb"]
             PRIA["Private subnet<br/>10.0.3.0/24<br/>role/internal-elb"]
             NAT["NAT Gateway<br/>single point of failure"]
-            NODE1["platform node group<br/>1x m6i.large ON-DEMAND"]
+            NODE1["system node group<br/>1-2x m6i.large ON-DEMAND<br/>Karpenter · CoreDNS · Vault<br/>Argo CD · Traefik"]
         end
         subgraph AZB["Availability Zone us-east-1b"]
             PUBB["Public subnet<br/>10.0.2.0/24"]
             PRIB["Private subnet<br/>10.0.4.0/24"]
-            NODE2["workload node group<br/>1-3x m6i.large SPOT"]
+            NODE2["Karpenter-provisioned nodes<br/>spot-first · consolidating<br/>apps · SonarQube · Prometheus<br/>Jenkins agents"]
         end
         NLB["Network Load Balancer<br/>public subnets"]
         RDS[("RDS PostgreSQL<br/>db.t4g.micro · single-AZ<br/>publicly_accessible = false")]
@@ -396,29 +398,49 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    U["User — Lagos"] -->|"HTTPS"| CF["CloudFront<br/>edge PoP — TLS terminates here"]
-    CF -->|"AWS backbone"| NLB["Network Load Balancer<br/>us-east-1"]
-    NLB --> TR["Traefik<br/>IngressRoute"]
-    TR -->|"Host: app.weysure.tld"| WEB["weysure-web<br/>Next.js"]
-    TR -->|"Host: api.weysure.tld"| API["weysure-api<br/>FastAPI"]
+    U["User — Lagos"] -->|"HTTPS"| CFE["Cloudflare edge<br/>Lagos PoP · TLS terminates here<br/>CDN · WAF · DDoS"]
+    CFE -->|"Full (strict) TLS<br/>to origin"| NLB["Network Load Balancer<br/>us-east-1"]
+    NLB --> TR["Traefik IngressRoute"]
+    TR -->|"weysure.beyrictech.com"| WEB["weysure-web<br/>Next.js"]
+    TR -->|"weysure-api.beyrictech.com"| API["weysure-api<br/>FastAPI"]
     API --> REDIS[("Redis<br/>rate limit + cache")]
     API --> RDS[("RDS PostgreSQL")]
-    CM["cert-manager"] -.->|"issues + renews<br/>Let's Encrypt cert"| TR
-    EDNS["external-dns"] -.->|"creates A / CNAME"| R53["Route 53"]
-    R53 -.->|"resolves"| CF
+    CM["cert-manager"] -.->|"Let's Encrypt cert<br/>via Cloudflare DNS-01"| TR
+    EDNS["external-dns"] -.->|"creates + updates records"| CFDNS["Cloudflare DNS"]
+    CFDNS -.->|"resolves, proxied"| CFE
 ```
+
+### DNS and domain
+
+| Item | Value |
+|---|---|
+| Apex domain | `beyrictech.com` |
+| Registrar | Namecheap |
+| Authoritative DNS | **Cloudflare** (nameservers delegated from Namecheap) |
+| Production frontend | `weysure.beyrictech.com` |
+| Production API | `weysure-api.beyrictech.com` |
+| Staging frontend | `weysure-stage.beyrictech.com` |
+| Staging API | `weysure-api-stage.beyrictech.com` |
+
+**Route 53 is not used.** Because DNS is delegated to Cloudflare, both `external-dns` and
+`cert-manager` use the Cloudflare provider with a scoped API token (stored in Vault), rather
+than Route 53 with IRSA. This removes one IRSA role and the hosted-zone charge.
 
 ### Latency mitigation for `us-east-1`
 
-`us-east-1` is roughly 140–180 ms from Lagos versus roughly 95 ms from Frankfurt. The
-decision to use `us-east-1` ([ADR-002](../../memory/DECISIONS.md)) is mitigated at the edge:
+`us-east-1` is roughly 140–180 ms from Lagos versus roughly 95 ms from Frankfurt
+([ADR-002](../../memory/DECISIONS.md)). Cloudflare's free plan mitigates this **better than
+CloudFront would, at zero cost** ([ADR-011](../../memory/DECISIONS.md)):
 
-- **CloudFront in front of the frontend** — static assets and TLS terminate at a nearby edge
-  PoP, removing most perceived page-load latency.
-- **CloudFront in front of the API** — the client's TCP and TLS handshake completes at the
-  edge, then travels the AWS backbone rather than the public internet. Typically recovers
-  30–40% of the gap.
-- **Redis for hot reads** — escrow and wallet flows avoid unnecessary round trips entirely.
+- **TLS terminates at Cloudflare's Lagos PoP**, so the expensive handshake never crosses the
+  Atlantic. The remaining hop travels Cloudflare's backbone rather than the public internet.
+- **Static assets cached at the edge** — most of a Next.js page load never reaches AWS.
+- **The NLB is never exposed publicly**; its security group admits only Cloudflare's published
+  IP ranges. This is a security gain, not only a performance one.
+- **Redis for hot reads** keeps escrow and wallet flows off unnecessary round trips.
+
+Origin TLS uses Cloudflare **Full (strict)** mode against a real Let's Encrypt certificate
+issued by cert-manager — not Flexible, which would leave the AWS-side leg unencrypted.
 
 ---
 
@@ -480,7 +502,8 @@ that was not done.
 ```mermaid
 flowchart TB
     F1["us-east-1a fails"] --> I1["NAT Gateway lost.<br/>All private-subnet egress dies,<br/>including healthy AZ-b nodes.<br/>Image pulls and outbound API calls fail."]
-    F2["Spot reclaim — 2-minute notice"] --> I2["workload node drained.<br/>Stateless pods reschedule.<br/>Prometheus loses in-flight scrapes."]
+    F2["Spot reclaim — 2-minute notice"] --> I2["Karpenter drains via SQS interruption queue<br/>and provisions a replacement.<br/>Prometheus loses in-flight scrapes."]
+    F8["system node group lost"] --> I8["Karpenter itself is down, so no new<br/>nodes are provisioned until the managed<br/>node group replaces the node (~3-5 min).<br/>Existing nodes keep running."]
     F3["Bad Kyverno policy"] --> I3["Both namespaces affected —<br/>stage and prod share one cluster."]
     F4["RDS instance failure"] --> I4["Single-AZ: restore from PITR.<br/>RPO approx 5 min · RTO approx 20 min."]
     F5["Vault sealed or down"] --> I5["No new secrets issued.<br/>Running pods keep current creds<br/>until the 1-hour TTL expires."]
@@ -491,7 +514,8 @@ flowchart TB
 | Failure | Mitigation in place | Accepted gap | Revisit trigger |
 |---|---|---|---|
 | AZ-a outage | Nodes span 2 AZs | **Single NAT = shared egress SPOF** | Budget increase, or first AZ incident |
-| Spot reclaim | PDBs, Node Termination Handler, on-demand baseline for stateful | Prometheus scrape gaps | Node capacity increase |
+| Spot reclaim | Karpenter SQS interruption handling, PDBs, on-demand system node group | Prometheus scrape gaps | Node capacity increase |
+| **Karpenter unavailable** | Managed node group replaces the system node automatically; running nodes unaffected | ~3–5 min with no new node provisioning | Second system node (min_size = 2) |
 | Cluster-wide policy error | Separate Argo CD projects, ResourceQuota, NetworkPolicy | **stage and prod share a cluster** | First stage-caused prod incident |
 | RDS failure | Automated backups + PITR, **restore rehearsed** | Single-AZ | First paying-customer SLA |
 | Vault outage | KMS auto-unseal removes the manual-unseal outage class | Single replica | Node capacity increase to 3-replica Raft HA |
