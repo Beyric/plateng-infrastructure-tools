@@ -55,7 +55,7 @@ claim can be re-derived.
 | EKS clusters | none |
 | VPCs | default `172.31.0.0/16` only |
 | Route 53 hosted zones | none |
-| Terraform state bucket `victor-terraform-state-2026` | exists; **versioning enabled**, **public access fully blocked** |
+| Terraform state bucket `beyric-tfstate-767397877316` | exists; **versioning enabled**, **public access fully blocked** |
 | State key `weysure/infrastructure/` | empty — never applied |
 | Identity | `arn:aws:iam::767397877316:user/s_user` (IAM **user**, static keys) |
 | Account MFA | enabled, 6 devices |
@@ -246,7 +246,7 @@ completion, and a rehearsed rollback.
 | **2** | **GitOps bootstrap** | Default `gp3` StorageClass binds a test PVC; metrics-server serving; Argo CD installed via the one documented manual bootstrap and **self-managing**; app-of-apps root reconciling | — |
 | **3** | **Secrets** | Vault deployed by Argo CD, initialised once, KMS auto-unseal working; recovery keys in AWS Secrets Manager; root token revoked; KV v2 populated; ESO syncing; Reloader verified by rotating a secret | — |
 | **4** | **Ingress & TLS** | Namecheap NS delegated to Cloudflare; Traefik behind an NLB; **NLB security group restricted to Cloudflare IP ranges**; cert-manager issuing a real Let's Encrypt certificate via Cloudflare DNS-01 using a **token read from Vault**; external-dns writing records; Traefik honouring `CF-Connecting-IP` | + LB |
-| **5** | **Data layer** | RDS applied with `manage_master_user_password`; Supabase→RDS migration rehearsed, verified and cut over; Redis running; **Vault database engine issuing 1-hour credentials**; restore drill timed | + DB |
+| **5** | **Data layer** | RDS applied with `manage_master_user_password`; schema built by `alembic upgrade head` (47 revisions) against the empty database; `DATABASE_URL` pointed at RDS; Redis running; **Vault database engine issuing 1-hour credentials**; **restore drill from PITR timed** | + DB |
 | **6** | **CI** | Jenkins on ephemeral agents; **SonarQube self-hosted with its PostgreSQL and `vm.max_map_count` handled**; Gitleaks, tests, Trivy all gating; image pushed via IRSA; tag commit to `plateng-gitops`; **no cluster credentials anywhere** | — |
 | **7** | **Application delivery** | Helm charts for API and web; probes, HPA, PDB, resource limits; migrations as an Argo CD PreSync hook (Finding ⑨); frontend Dockerfile with `output: "standalone"` | — |
 | **8** | **Policy** | Kyverno enforcing baseline policies; default-deny NetworkPolicies; ResourceQuota per namespace | — |
@@ -290,7 +290,7 @@ Well-Architected review that finds nothing is a review that was not performed.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Database migration data loss | Low | **Low** — *no live users or real money yet* | Rehearse before executing; row-count and checksum verification; Supabase retained read-only for rollback. Risk drops sharply because there is no production traffic to lose |
+| ~~Database migration data loss~~ | — | **None** | **Eliminated.** The Supabase database is empty (confirmed 2026-08-27; see the ADR-001 amendment). There is no data to move, so Phase 5 builds the schema from 47 Alembic revisions rather than migrating rows |
 | EKS lockout on first apply | Medium | High | Access entries declared in Terraform; verified from a second identity before proceeding |
 | Cost overrun | Medium | Medium | Budget alarms in Phase 0; cost reviewed at each phase gate |
 | Spot reclaim during a deploy | Medium | Low | On-demand baseline for stateful; PDBs; Node Termination Handler |

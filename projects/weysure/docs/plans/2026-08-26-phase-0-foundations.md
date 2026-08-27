@@ -23,7 +23,7 @@ fires before a surprise bill does. Every later phase depends on these guardrails
 - **Never commit to a default branch.** Work on `feature/*`; every change lands via pull request.
 - **Never print a secret value.** Key *names* may be listed; values never.
 - **Adebayo runs every state-mutating command himself** — see [`HUMAN_GATED_COMMANDS.md`](../../../../docs/conventions/HUMAN_GATED_COMMANDS.md). An agent prepares the command, the working directory, the expected output and the rollback, then **stops**. Steps marked **[HUMAN]** are handed over, never executed by an agent.
-- **Terraform state bucket:** `victor-terraform-state-2026`, key prefix `weysure/`, region `us-east-1`.
+- **Terraform state bucket:** `beyric-tfstate-767397877316`, key prefix `weysure/`, region `us-east-1`.
 - **Resource tagging:** every AWS resource carries `Project=weysure`, `Environment`, `ManagedBy=terraform`, `Repository=Beyric/plateng-infrastructure-tools`, applied through the provider's `default_tags`. Cost Explorer grouping depends on this.
 
 ### Inputs you must supply
@@ -842,7 +842,7 @@ provider "aws" {
 }
 ```
 
-The `profile` value changes to `weysure-sso` in Task 7; leave it as `personal` for now so the
+The `profile` value changes to `beyric-admin` in Task 7; leave it as `personal` for now so the
 configuration stays usable between the two tasks.
 
 - [ ] **Step 9: Write the example tfvars**
@@ -1316,7 +1316,7 @@ and `s_user` has **one active access key**, `the s_user access key`, created 202
 - Modify: `projects/weysure/terraform/versions.tf` — backend and provider profile
 
 **Interfaces:**
-- Produces: an AWS CLI profile named `weysure-sso` that every later phase uses.
+- Produces: an AWS CLI profile named `beyric-admin` that every later phase uses.
 
 > **Steps 2 and 3 are console operations that cannot be scripted**, and Step 2 changes the
 > account's organizational structure. Get explicit approval before running it.
@@ -1406,7 +1406,7 @@ Expected: one instance. If still empty, enablement did not complete — do not c
 - [ ] **Step 6: Configure the SSO profile** *([HUMAN])*
 
 ```bash
-aws configure sso --profile weysure-sso
+aws configure sso --profile beyric-admin
 ```
 
 Answer:
@@ -1424,8 +1424,8 @@ Answer:
 - [ ] **Step 7: Verify the SSO profile authenticates as a role, not a user**
 
 ```bash
-aws sso login --profile weysure-sso
-aws sts get-caller-identity --profile weysure-sso --query Arn --output text
+aws sso login --profile beyric-admin
+aws sts get-caller-identity --profile beyric-admin --query Arn --output text
 ```
 
 Expected: an ARN of the form
@@ -1435,7 +1435,7 @@ It must contain `assumed-role`, not `user/`.
 - [ ] **Step 8: Verify the profile can reach the Terraform state bucket**
 
 ```bash
-aws s3api head-bucket --bucket victor-terraform-state-2026 --profile weysure-sso && echo "state bucket reachable ✓"
+aws s3api head-bucket --bucket beyric-tfstate-767397877316 --profile beyric-admin && echo "state bucket reachable ✓"
 ```
 
 Expected: `state bucket reachable ✓`. If this fails, do **not** delete the access key — you would
@@ -1444,7 +1444,7 @@ lose access to your own state.
 - [ ] **Step 9: Point Terraform at the SSO profile**
 
 In `projects/weysure/terraform/versions.tf`, change both occurrences of
-`profile = "personal"` to `profile = "weysure-sso"` — one in the `backend "s3"` block, one in
+`profile = "personal"` to `profile = "beyric-admin"` — one in the `backend "s3"` block, one in
 the `provider "aws"` block.
 
 Verify:
@@ -1455,7 +1455,7 @@ grep -n 'profile' versions.tf
 terraform init -backend=false && terraform validate
 ```
 
-Expected: both lines read `profile = "weysure-sso"`, and `Success! The configuration is valid.`
+Expected: both lines read `profile = "beyric-admin"`, and `Success! The configuration is valid.`
 
 - [ ] **Step 10: Deactivate the access key before deleting it** *([HUMAN])*
 
@@ -1463,8 +1463,8 @@ Deactivate first. If something breaks, reactivation is instant; deletion is irre
 
 ```bash
 aws iam update-access-key --user-name s_user --access-key-id "$KEY_ID" \
-  --status Inactive --profile weysure-sso
-aws iam list-access-keys --user-name s_user --profile weysure-sso \
+  --status Inactive --profile beyric-admin
+aws iam list-access-keys --user-name s_user --profile beyric-admin \
   --query 'AccessKeyMetadata[].[AccessKeyId,Status]' --output text
 ```
 
@@ -1472,14 +1472,14 @@ Expected: the same key id, now `Inactive`.
 
 - [ ] **Step 11: Work normally for at least one full session**
 
-Use `--profile weysure-sso` for every AWS command for the rest of Phase 0. If nothing breaks,
+Use `--profile beyric-admin` for every AWS command for the rest of Phase 0. If nothing breaks,
 proceed. If something does, reactivate with `--status Active` and investigate.
 
 - [ ] **Step 12: Delete the access key** *(irreversible — [HUMAN])*
 
 ```bash
-aws iam delete-access-key --user-name s_user --access-key-id "$KEY_ID" --profile weysure-sso
-aws iam list-access-keys --user-name s_user --profile weysure-sso --query 'AccessKeyMetadata' --output text
+aws iam delete-access-key --user-name s_user --access-key-id "$KEY_ID" --profile beyric-admin
+aws iam list-access-keys --user-name s_user --profile beyric-admin --query 'AccessKeyMetadata' --output text
 ```
 
 Expected: empty output — no access keys remain.
@@ -1521,16 +1521,60 @@ The last thing to exist before Phase 1 spends money.
 **Interfaces:**
 - Produces: budget alarms that stay in place for the life of the platform.
 
-- [ ] **Step 1: Confirm no budget exists (the failing test)**
+- [ ] **Step 1: Create the state bucket** *([HUMAN])*
+
+`beyric-tfstate-767397877316` does not exist yet — ADR-015 renames it from the old
+`victor-terraform-state-2026`. The old bucket held one state file describing **zero** resources,
+so there is nothing to migrate; this is a create, not a move.
+
+**A state bucket cannot be managed by the Terraform that uses it as a backend** — Terraform
+would need the bucket to exist before it could create the bucket. Every team hits this and the
+standard answer is the same: create it out-of-band, once, and document that you did.
+
+**Where:** anywhere
 
 ```bash
-aws budgets describe-budgets --account-id 767397877316 --profile weysure-sso \
+aws s3api create-bucket --bucket beyric-tfstate-767397877316 --region us-east-1 --profile beyric-admin
+aws s3api put-bucket-versioning --bucket beyric-tfstate-767397877316 \
+  --versioning-configuration Status=Enabled --profile beyric-admin
+aws s3api put-public-access-block --bucket beyric-tfstate-767397877316 \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true \
+  --profile beyric-admin
+aws s3api put-bucket-encryption --bucket beyric-tfstate-767397877316 \
+  --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"},"BucketKeyEnabled":true}]}' \
+  --profile beyric-admin
+```
+
+**Expect:** the create returns a `Location`; the three hardening calls return silently.
+`us-east-1` is the one region where `create-bucket` takes no `LocationConstraint` — in any other
+region that call fails without one.
+
+**If it goes wrong:** a `BucketAlreadyExists` error means the name is taken by *another AWS
+customer* — S3 bucket names are globally unique across all accounts, which is exactly why the
+account id is in the name. `BucketAlreadyOwnedByYou` means you already made it; carry on.
+
+- [ ] **Step 2: Verify the bucket is correctly hardened**
+
+```bash
+aws s3api get-bucket-versioning --bucket beyric-tfstate-767397877316 --profile beyric-admin --query Status --output text
+aws s3api get-public-access-block --bucket beyric-tfstate-767397877316 --profile beyric-admin \
+  --query 'PublicAccessBlockConfiguration' --output json
+aws s3api get-bucket-encryption --bucket beyric-tfstate-767397877316 --profile beyric-admin \
+  --query 'ServerSideEncryptionConfiguration.Rules[].ApplyServerSideEncryptionByDefault.SSEAlgorithm' --output text
+```
+
+**Expect:** `Enabled`; all four public-access settings `true`; `AES256`.
+
+- [ ] **Step 3: Confirm no budget exists (the failing test)**
+
+```bash
+aws budgets describe-budgets --account-id 767397877316 --profile beyric-admin \
   --query 'Budgets[].BudgetName' --output text 2>&1
 ```
 
 Expected: empty output, or a `NotFound` error.
 
-- [ ] **Step 2: Create the monthly budget with three alert thresholds** *([HUMAN])*
+- [ ] **Step 4: Create the monthly budget with three alert thresholds** *([HUMAN])*
 
 The alert address is already filled in below.
 
@@ -1564,38 +1608,38 @@ JSON
 aws budgets create-budget --account-id 767397877316 \
   --budget file:///tmp/budget.json \
   --notifications-with-subscribers file:///tmp/notifications.json \
-  --profile weysure-sso
+  --profile beyric-admin
 ```
 
 The third alert is **FORECASTED**, not ACTUAL — it fires when AWS projects you will exceed the
 limit, which is what gives you time to act rather than a post-mortem.
 
-- [ ] **Step 3: Verify the budget and its alerts**
+- [ ] **Step 5: Verify the budget and its alerts**
 
 ```bash
-aws budgets describe-budgets --account-id 767397877316 --profile weysure-sso \
+aws budgets describe-budgets --account-id 767397877316 --profile beyric-admin \
   --query 'Budgets[].{Name:BudgetName,Limit:BudgetLimit.Amount}' --output table
 aws budgets describe-notifications-for-budget --account-id 767397877316 \
-  --budget-name weysure-platform-monthly --profile weysure-sso \
+  --budget-name weysure-platform-monthly --profile beyric-admin \
   --query 'Notifications[].{Type:NotificationType,Threshold:Threshold}' --output table
 ```
 
 Expected: one budget at `250`, and three notifications — ACTUAL 50, ACTUAL 80, FORECASTED 100.
 
-- [ ] **Step 4: Confirm the state bucket is still correctly hardened**
+- [ ] **Step 6: Confirm the old bucket can be retired**
 
 ```bash
-aws s3api get-bucket-versioning --bucket victor-terraform-state-2026 --profile weysure-sso --query Status --output text
-aws s3api get-public-access-block --bucket victor-terraform-state-2026 --profile weysure-sso \
+aws s3api get-bucket-versioning --bucket beyric-tfstate-767397877316 --profile beyric-admin --query Status --output text
+aws s3api get-public-access-block --bucket beyric-tfstate-767397877316 --profile beyric-admin \
   --query 'PublicAccessBlockConfiguration' --output json
-aws s3api get-bucket-encryption --bucket victor-terraform-state-2026 --profile weysure-sso \
+aws s3api get-bucket-encryption --bucket beyric-tfstate-767397877316 --profile beyric-admin \
   --query 'ServerSideEncryptionConfiguration.Rules[].ApplyServerSideEncryptionByDefault.SSEAlgorithm' --output text
 ```
 
 Expected: `Enabled`; all four public-access settings `true`; an encryption algorithm
 (`AES256` or `aws:kms`).
 
-- [ ] **Step 5: Confirm S3 native state locking is available**
+- [ ] **Step 7: Confirm S3 native state locking is available**
 
 Terraform 1.10 introduced `use_lockfile`, which holds the lock as an S3 object and replaces the
 old DynamoDB lock table. `versions.tf` already declares it. Confirm the toolchain supports it:
@@ -1607,13 +1651,13 @@ grep -n 'use_lockfile' ~/Documents/plateng-infra/plateng-infrastructure-tools/pr
 
 Expected: `Terraform v1.15.8` (>= 1.10) and `use_lockfile = true`.
 
-- [ ] **Step 6: Restrict the state bucket to the PlatformAdmin role** *([HUMAN])*
+- [ ] **Step 8: Deny insecure transport on the state bucket** *([HUMAN])*
 
 State contains resource identifiers, and — for resources that do not support managed
 passwords — occasionally sensitive values. Only the platform role should read it.
 
 ```bash
-ROLE_ARN=$(aws sts get-caller-identity --profile weysure-sso --query Arn --output text \
+ROLE_ARN=$(aws sts get-caller-identity --profile beyric-admin --query Arn --output text \
   | sed -E 's#assumed-role/([^/]+)/.*#role/\1#; s#sts::#iam::#')
 echo "restricting to: $ROLE_ARN"
 
@@ -1627,8 +1671,8 @@ cat > /tmp/state-bucket-policy.json <<JSON
       "Principal": "*",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::victor-terraform-state-2026",
-        "arn:aws:s3:::victor-terraform-state-2026/*"
+        "arn:aws:s3:::beyric-tfstate-767397877316",
+        "arn:aws:s3:::beyric-tfstate-767397877316/*"
       ],
       "Condition": { "Bool": { "aws:SecureTransport": "false" } }
     }
@@ -1636,9 +1680,9 @@ cat > /tmp/state-bucket-policy.json <<JSON
 }
 JSON
 
-aws s3api put-bucket-policy --bucket victor-terraform-state-2026 \
-  --policy file:///tmp/state-bucket-policy.json --profile weysure-sso
-aws s3api get-bucket-policy --bucket victor-terraform-state-2026 --profile weysure-sso \
+aws s3api put-bucket-policy --bucket beyric-tfstate-767397877316 \
+  --policy file:///tmp/state-bucket-policy.json --profile beyric-admin
+aws s3api get-bucket-policy --bucket beyric-tfstate-767397877316 --profile beyric-admin \
   --query Policy --output text | python3 -m json.tool
 ```
 
@@ -1649,7 +1693,7 @@ Expected: the policy echoed back with the `DenyInsecureTransport` statement.
 > to lock yourself out of your own Terraform state, and unlike an IAM policy it cannot be fixed
 > from anywhere except the bucket owner. Revisit when a CI principal needs state access.
 
-- [ ] **Step 7: Dry-run the entire chain end to end**
+- [ ] **Step 9: Dry-run the entire chain end to end**
 
 This is the highest-value verification in Phase 0. `terraform plan` creates nothing and costs
 nothing, but it exercises the whole path: SSO credentials → S3 backend → state locking → AWS
@@ -1666,16 +1710,16 @@ Expected: `Terraform has been successfully initialized`, then a plan summary of 
 `Plan: N to add, 0 to change, 0 to destroy.` — every resource is an *add*, because nothing
 exists yet.
 
-- [ ] **Step 8: Confirm the lock was acquired and released**
+- [ ] **Step 10: Confirm the lock was acquired and released**
 
 ```bash
-aws s3 ls s3://victor-terraform-state-2026/weysure/infrastructure/ --profile weysure-sso
+aws s3 ls s3://beyric-tfstate-767397877316/weysure/infrastructure/ --profile beyric-admin
 ```
 
 Expected: **no `.tflock` object.** A leftover lock file means a previous run was interrupted;
 clear it with `terraform force-unlock <LOCK_ID>` before continuing.
 
-- [ ] **Step 9: Discard the plan — nothing is applied in Phase 0**
+- [ ] **Step 11: Discard the plan — nothing is applied in Phase 0**
 
 ```bash
 rm -f /tmp/phase0-dryrun.tfplan
@@ -1686,7 +1730,7 @@ git status --short
 Expected: `terraform.tfvars` does **not** appear — `.gitignore` covers `*.tfvars`. If it does
 appear, stop and fix `.gitignore` before committing anything.
 
-- [ ] **Step 10: Document the controls**
+- [ ] **Step 12: Document the controls**
 
 Create `projects/weysure/docs/runbooks/COST_CONTROLS.md`:
 
@@ -1753,7 +1797,7 @@ terraform destroy
 and follow `DATABASE_RECOVERY.md`.
 ```
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
 cd ~/Documents/plateng-infra/plateng-infrastructure-tools
@@ -1795,9 +1839,9 @@ echo "── terraform ──";  terraform fmt -check -recursive . && echo "fmt 
 echo "── secrets ──";    gitleaks detect --no-git --source . --config .gitleaks.toml --redact; echo "gitleaks exit=$?"
 grep -rn 'db_password' . --include='*.tf' --include='*.tfvars*' || echo "no db_password ✓"
 echo "── ecr ──";        grep -n 'image_tag_mutability' projects/weysure/terraform/main.tf
-echo "── identity ──";   aws sts get-caller-identity --profile weysure-sso --query Arn --output text
-aws iam list-access-keys --user-name s_user --profile weysure-sso --query 'AccessKeyMetadata' --output text
-echo "── budget ──";     aws budgets describe-budgets --account-id 767397877316 --profile weysure-sso --query 'Budgets[].BudgetName' --output text
+echo "── identity ──";   aws sts get-caller-identity --profile beyric-admin --query Arn --output text
+aws iam list-access-keys --user-name s_user --profile beyric-admin --query 'AccessKeyMetadata' --output text
+echo "── budget ──";     aws budgets describe-budgets --account-id 767397877316 --profile beyric-admin --query 'Budgets[].BudgetName' --output text
 echo "── protection ──"
 for R2 in Beyric/plateng-infrastructure-tools Beyric/plateng-gitops innocent98/Weysure-API innocent98/Weysure; do
   printf '%-42s ' "$R2"; gh api "repos/$R2/branches/main/protection" --jq '.required_pull_request_reviews.required_approving_review_count' 2>&1
@@ -1998,7 +2042,7 @@ Every item verified, not assumed.
 - [ ] `plateng-gitops` scaffolded with a literal-Secret guard rule
 - [ ] Branch protection active on all four repositories; direct push to `main` proven rejected
 - [ ] `CODEOWNERS` present on both platform repositories
-- [ ] AWS Organization created; IAM Identity Center live; `weysure-sso` profile assuming a role
+- [ ] AWS Organization created; IAM Identity Center live; `beyric-admin` profile assuming a role
 - [ ] The `s_user` access key deleted — `list-access-keys` returns empty
 - [ ] Budget `weysure-platform-monthly` active with three alerts
 - [ ] Provider `default_tags` applied; Cost Explorer can group by `Project`
