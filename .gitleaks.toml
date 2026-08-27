@@ -7,15 +7,16 @@ description = "Paths that legitimately contain secret-shaped strings"
 paths = [
   '''\.gitleaks\.toml$''',
   '''terraform\.tfvars\.example$''',
-  '''projects/weysure/docs/.*\.md$''',
 ]
 
 [[rules]]
 id = "terraform-inline-password"
 description = "A password, secret or token assigned literally in a .tf or .tfvars file"
 regex = '''(?i)(password|secret|token|access_key)\s*=\s*"[^"$][^"]{7,}"'''
-path = '''\.tfvars?$'''
-[rules.allowlist]
-regexes = [
-  '''=\s*"(<redacted>|REPLACE_ME|CHANGEME|example)"''',
-]
+path = '''\.tf(vars)?$'''
+
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    '''=\s*"(<redacted>|REPLACE_ME|CHANGEME|EXAMPLE_VALUE)"''',
+  ]

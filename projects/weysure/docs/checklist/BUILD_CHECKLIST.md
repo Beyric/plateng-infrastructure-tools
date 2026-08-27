@@ -40,8 +40,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] `CODEOWNERS` on both platform repos
 - [ ] **Secret hygiene** *(Finding ①)*
   - [ ] Remove `db_password` from `terraform.tfvars` before any commit
-  - [ ] Gitleaks pre-commit hook installed locally
-  - [ ] Gitleaks scan across all four repos, including full history
+  - [x] Gitleaks pre-commit hook installed locally
+  - [x] Gitleaks scan across all four repos, including full history
 - [ ] **Terraform migration** *(Finding ②)*
   - [ ] Move `~/Documents/plateng-infra/weysure-infrastructure` into `projects/weysure/`
   - [ ] Extract shared modules to `modules/`
