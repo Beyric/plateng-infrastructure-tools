@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-08-26
+> **Last reconciled:** 2026-08-26 (revised: Karpenter, Cloudflare, SonarQube)
 
 ## Snapshot
 
@@ -11,8 +11,11 @@
 |---|---|
 | ✅ Complete | 0 / 11 phases |
 | 🔵 In progress | 1 — Phase 0 (design approved, not started) |
+| ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
 | 💰 Current AWS spend | **$0** — nothing applied |
+| 📐 Projected steady-state | **$240–270/mo** |
+| 📊 Diagrams | 10, all render-verified with `mmdc` |
 
 **Legend:** ⚪ planned · 🔵 in progress · ✅ complete · ⚠ blocked · ⏸ deferred
 
@@ -69,10 +72,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] **Verify cluster access from a second identity before proceeding**
 - [ ] EKS add-ons: `vpc-cni`, `coredns`, `kube-proxy`, `aws-ebs-csi-driver` *(Finding ⑤)*
 - [ ] `aws_iam_openid_connect_provider` — IRSA foundation *(Finding ⑤)*
-- [ ] Node group `platform` — 1 × m6i.large ON_DEMAND, labelled + tainted
-- [ ] Node group `workload` — 1–3 × m6i.large SPOT, labelled + tainted
-- [ ] AWS Node Termination Handler
-- [ ] Cluster Autoscaler with IRSA
+- [ ] Node group `system` — 1–2 × m6i.large ON_DEMAND, labelled + tainted
+- [ ] **Karpenter** installed *(ADR-012)*
+  - [ ] IRSA role + node instance profile
+  - [ ] SQS interruption queue + EventBridge rules (replaces Node Termination Handler)
+  - [ ] `EC2NodeClass` — AMI family, subnet + security-group selectors, **userData setting `vm.max_map_count = 262144`** for SonarQube *(ADR-013)*
+  - [ ] `NodePool` — spot-first, families `m6i m7i m6a m5 c6i r6i`, consolidation enabled, disruption budget
+  - [ ] **Verify:** a test deployment provisions a node, then consolidates away on delete
 - [ ] ECR set to `IMMUTABLE`; lifecycle policy *(Finding ⑪)*
 - [ ] S3 Gateway VPC Endpoint
 - [ ] `kubectx` / `kubens` contexts configured; k9s verified
@@ -84,11 +90,16 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 - [ ] `gp3` StorageClass as default; **test PVC binds**
 - [ ] metrics-server
-- [ ] Domain registered / delegated; Route 53 hosted zone *(Open question 1)*
+- [ ] **Cloudflare zone for `beyrictech.com`**; delegate nameservers from Namecheap *(ADR-011)*
+- [ ] Cloudflare API token (scoped: Zone.DNS edit only) → Vault
 - [ ] Traefik via Helm, behind an NLB
-- [ ] cert-manager + `ClusterIssuer` (Let's Encrypt, DNS-01 via IRSA)
+- [ ] **NLB security group restricted to Cloudflare published IP ranges**
+- [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
+- [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
 - [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
-- [ ] external-dns with IRSA
+- [ ] external-dns with the **Cloudflare provider**
+- [ ] Cloudflare TLS mode set to **Full (strict)** — never Flexible
+- [ ] DNS records: `weysure`, `weysure-api`, `weysure-stage`, `weysure-api-stage`
 - [ ] End-to-end: test workload reachable over HTTPS with a valid certificate
 - [ ] SOP · diagram · Well-Architected delta
 
@@ -145,7 +156,12 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] IRSA role for ECR push — **no AWS access keys anywhere** *(Finding ⑦)*
 - [ ] GitHub App (scoped) for the GitOps tag commit
 - [ ] Gitleaks stage *(Finding ⑦)*
-- [ ] SonarQube stage + quality gate *(Open question 3)*
+- [ ] **SonarQube self-hosted** *(ADR-013)*
+  - [ ] In-cluster PostgreSQL + PVC
+  - [ ] PVCs for SonarQube data and extensions
+  - [ ] **`vm.max_map_count = 262144` confirmed on the host** — SonarQube crash-loops without it
+  - [ ] File-descriptor limit raised (`nofile` ≈ 131072)
+  - [ ] Quality gate wired into the pipeline as a blocking stage
 - [ ] Test stage with coverage reporting
 - [ ] Trivy image scan stage
 - [ ] Build tagged by **git SHA only** — never `:latest` *(Finding ⑪)*
@@ -205,8 +221,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Backlog — identified, not yet scheduled
 
-- [ ] CloudFront distributions for frontend and API *(ADR-002 latency mitigation)*
-- [ ] WAF in front of CloudFront
+- [x] ~~CloudFront distributions~~ — superseded by Cloudflare free edge *(ADR-011)*
+- [x] ~~WAF~~ — included in the Cloudflare free plan *(ADR-011)*
 - [ ] Multi-arch (ARM64) image builds, prerequisite for Graviton
 - [ ] Renovate / Dependabot for dependency and chart updates
 - [ ] Terraform Cloud or Atlantis for plan-on-PR
@@ -218,17 +234,18 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Item | Why deferred | Revisit trigger | ADR |
 |---|---|---|---|
 | Linkerd service mesh | ~40% of the on-demand node in sidecar overhead | Node capacity increase | ADR-004 |
-| Karpenter | Learn node groups first | Phase 10 cost review | ADR-003 |
 | Multi-AZ NAT Gateway | +$33/mo | Budget increase or first AZ incident | ADR-004 |
 | Multi-AZ RDS | Doubles instance cost | First paying-customer SLA | ADR-004 |
 | Separate prod cluster | +$73/mo + nodes | Stage causes a prod incident | ADR-006 |
 | 3-replica Vault HA | Node capacity | Node capacity increase | ADR-007 |
 | EKS Pod Identity (over IRSA) | Helm chart support still favours IRSA | Ecosystem maturity | — |
 
-## Open questions — blocking
+## Resolved questions
 
-| # | Question | Blocks |
+| # | Question | Answer |
 |---|---|---|
-| 1 | Which domain, and where is it registered? No Route 53 zone exists. | Phase 2 |
-| 2 | Live users and real money today, or pre-launch? Changes migration window and rollback posture. | Phase 3 |
-| 3 | SonarQube self-hosted (~1 vCPU / 2 GiB + a database) or SonarCloud SaaS? | Phase 6 |
+| 1 | Domain and DNS | `beyrictech.com` · Namecheap registrar · **Cloudflare DNS** · `weysure.` and `weysure-api.` *(ADR-011)* |
+| 2 | Live users / real money | **No** — pre-launch. Migration risk drops from severe to low |
+| 3 | SonarQube | **Self-hosted in-cluster** with its own PostgreSQL *(ADR-013)* |
+
+**Open questions: none currently blocking.**

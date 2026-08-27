@@ -9,32 +9,39 @@ configuration lives under `projects/<product>/`.
 ## Status
 
 **Design phase.** No AWS resources have been created. Current spend: **$0**.
+Projected steady state: **$240–270/mo**.
+
+Each product gets its own subtree under `projects/`, carrying its own spec, architecture
+diagrams, decision records, runbooks and build checklist. Terraform modules in `modules/` are
+shared; product-specific configuration lives in `projects/<product>/`.
 
 ## Layout
 
 ```text
 .
 ├── modules/                 # Reusable Terraform modules (vpc, eks, rds, …)
-├── projects/
-│   └── weysure/             # Per-product Terraform configuration
 ├── docs/
-│   ├── architecture/        # Mermaid diagrams — the source of truth for intent
-│   ├── superpowers/specs/   # Design specs (pre-work)
-│   ├── sop/                 # Standard operating procedures (post-ship record)
-│   ├── runbooks/            # Incident and operational procedures
-│   └── checklist/           # Master build checklist
-└── memory/
-    └── DECISIONS.md         # Architecture decision records
+│   └── conventions/         # Cross-project platform conventions
+└── projects/
+    └── weysure/             # Everything scoped to one product
+        ├── docs/
+        │   ├── architecture/  # Mermaid diagrams — source of truth for intent
+        │   ├── specs/         # Design specs (pre-work)
+        │   ├── sop/           # Standard operating procedures (post-ship record)
+        │   ├── runbooks/      # Incident and operational procedures
+        │   └── checklist/     # Master build checklist
+        └── memory/
+            └── DECISIONS.md   # Architecture decision records
 ```
 
 ## Start here
 
 | Document | Purpose |
 |---|---|
-| [Architecture](docs/architecture/ARCHITECTURE.md) | 10 diagrams — target state, network, CI/CD, identity, secrets, failure modes |
-| [Design spec](docs/superpowers/specs/2026-08-26-weysure-platform-design.md) | Full design, findings, phase plan, Well-Architected review |
-| [Build checklist](docs/checklist/PLATFORM_BUILD_CHECKLIST.md) | What is done, in progress, and ahead |
-| [Decision records](memory/DECISIONS.md) | Why each choice was made, and when to revisit it |
+| [Architecture](projects/weysure/docs/architecture/ARCHITECTURE.md) | 10 diagrams — target state, network, CI/CD, identity, secrets, failure modes |
+| [Design spec](projects/weysure/docs/specs/2026-08-26-weysure-platform-design.md) | Full design, findings, phase plan, Well-Architected review |
+| [Build checklist](projects/weysure/docs/checklist/BUILD_CHECKLIST.md) | What is done, in progress, and ahead |
+| [Decision records](projects/weysure/memory/DECISIONS.md) | Why each choice was made, and when to revisit it |
 
 ## Working agreement
 

@@ -51,7 +51,8 @@ safer and permitting logical replication); `eu-west-1` (cheapest EU region); `af
 (closest, but a 15–30% price premium and a thinner service catalogue).
 
 **Consequences.** Cheapest region and widest service coverage. Higher baseline latency,
-mitigated by CloudFront edge TLS termination for both frontend and API, plus Redis caching.
+mitigated by Cloudflare edge TLS termination for both frontend and API (see ADR-011), plus
+Redis caching.
 The Supabase→RDS cutover becomes cross-region, so a maintenance window replaces logical
 replication. `us-east-1` also has AWS's most publicised large-scale outage history.
 
@@ -60,36 +61,47 @@ justified.
 
 ---
 
-## ADR-003 — Two managed node groups: `platform` (on-demand) and `workload` (spot)
+## ADR-003 — One managed `system` node group; Karpenter provisions everything else
 
-**Date:** 2026-08-26 · **Status:** Accepted
+**Date:** 2026-08-26 · **Status:** Accepted · *(revised same day — see ADR-012)*
 
 **Context.** Budget ceiling is $150–250/month. The EKS control plane consumes $73 of that
 before any workload runs. Capacity analysis showed the platform stack needs ~4.5–6 vCPU and
 13–17 GiB of requests; the originally configured `2 × t3.medium` provides ~3.5 vCPU / 6.4 GiB.
 
-**Decision.** `platform` — 1 × `m6i.large` on-demand, hosting anything stateful or
-control-plane-like. `workload` — 1–3 × `m6i.large` spot, hosting stateless replicas,
-Prometheus, and ephemeral CI agents.
+**Decision.** A single managed `system` node group — 1–2 × `m6i.large` on-demand — hosting
+Karpenter itself, CoreDNS, and the control-plane-like platform components (Argo CD, Vault,
+Traefik, cert-manager). **Karpenter provisions all other capacity** as spot-first NodePools
+(ADR-012), replacing the originally planned static `workload` node group.
 
 **Alternatives.** All on-demand (~$140/mo compute, over budget). All spot (Vault and Argo CD
 subject to 2-minute reclaim). Karpenter (better economics, but obscures the primitives being
 learned).
 
 **Consequences.** Spot is 65–70% cheaper for reclaim-tolerant workloads. Requires node
-labels, `nodeAffinity`, taints, `PodDisruptionBudget`s, and the AWS Node Termination Handler.
-`m6i` over `t3` avoids CPU-credit throttling, which presents as an unexplained slowdown
-rather than an error.
+labels, `nodeAffinity`, taints and `PodDisruptionBudget`s; Karpenter handles spot interruption
+natively via an SQS queue, replacing the AWS Node Termination Handler and the Cluster
+Autoscaler.
+
+**On instance family — why `m6i` and not `t3`.** `t3` is *burstable*: it earns CPU credits
+while idle and spends them under load. A `t3.medium` sustains only **20% of a vCPU** once
+credits are exhausted (`t3.large`, 30%). Kubernetes nodes run many small always-on
+controllers plus bursty work — Prometheus scrapes, SonarQube analysis, image builds — which
+drains credits and then throttles. The failure presents as *unexplained slowness*, not an
+error, which makes it expensive to diagnose. `m6i` is fixed-performance: 2 vCPU means 2 vCPU,
+always. Under Karpenter the NodePool permits a *family set* (`m6i`, `m7i`, `m6a`, `m5`, `c6i`,
+`r6i`) so Karpenter selects the cheapest instance that fits the pending pods.
 
 **Revisit if:** budget increases, or at the Phase 10 cost review (Karpenter, Graviton).
 
 ---
 
-## ADR-004 — Deferred scope: Linkerd, Karpenter, multi-AZ NAT, multi-AZ RDS
+## ADR-004 — Deferred scope: Linkerd, multi-AZ NAT, multi-AZ RDS
 
 **Date:** 2026-08-26 · **Status:** Accepted
 
-**Decision.** Defer all four, each with an explicit revisit trigger.
+**Decision.** Defer all three, each with an explicit revisit trigger. *(Karpenter was
+originally in this list; superseded by ADR-012, which brings it into scope.)*
 
 **Consequences.** Linkerd's sidecar costs ~50m CPU / ~50 MiB on *every* pod — roughly 40% of
 the on-demand node for mTLS not yet needed. A single NAT Gateway is a shared egress SPOF
@@ -210,3 +222,108 @@ access to the state bucket.
 **Consequences.** The master password is never in tfvars, never in state, never in git.
 Terraform cannot read it back, which is the point. Vault uses it as the root rotation
 credential for its database engine, and the application never sees it at all.
+
+---
+
+## ADR-011 — Cloudflare for DNS and edge; Route 53 and CloudFront not used
+
+**Date:** 2026-08-26 · **Status:** Accepted · **Supersedes** the CloudFront element of ADR-002
+
+**Context.** `beyrictech.com` is registered at Namecheap, with authoritative DNS to be
+delegated to Cloudflare. Production hostnames are `weysure.beyrictech.com` and
+`weysure-api.beyrictech.com`. The account has no Route 53 hosted zone.
+
+**Decision.** Delegate nameservers from Namecheap to Cloudflare. Use Cloudflare for DNS, CDN,
+WAF and DDoS protection. `external-dns` and `cert-manager` use the Cloudflare provider with a
+scoped API token stored in Vault. Route 53 and CloudFront are not used.
+
+**Alternatives.** Route 53 + CloudFront (native AWS, IRSA-authenticated, but ~$0.50/mo for
+the zone plus CloudFront request and transfer charges, and no free WAF). Namecheap DNS
+directly (no CDN, no `external-dns` support, no WAF).
+
+**Consequences.** Cloudflare's **free** plan terminates TLS at a Lagos PoP — materially better
+for West African users than CloudFront, at zero cost — and this is the primary mitigation for
+the `us-east-1` latency accepted in ADR-002. The NLB is never publicly exposed: its security
+group admits only Cloudflare's published IP ranges, which is a security gain as much as a
+performance one. Origin TLS uses **Full (strict)** against a real Let's Encrypt certificate —
+never Flexible, which would leave the AWS-side leg unencrypted.
+
+Costs: one IRSA role is replaced by a Cloudflare API token, which is a credential to store
+and rotate rather than a role to assume. DNS availability now depends on Cloudflare.
+Cloudflare's proxy also masks client IPs unless `CF-Connecting-IP` is honoured — Traefik must
+be configured for it, or rate limiting will see one address.
+
+**Revisit if:** a hard requirement emerges for AWS-native edge (e.g. Shield Advanced, or
+signed URLs tied to CloudFront).
+
+---
+
+## ADR-012 — Adopt Karpenter for node provisioning
+
+**Date:** 2026-08-26 · **Status:** Accepted · **Supersedes** the deferral in ADR-004
+
+**Context.** The original plan used two static managed node groups and deferred Karpenter to a
+Phase 10 optimisation, on the reasoning that node groups, taints and the Cluster Autoscaler
+should be learned first. Two things changed that calculus: Karpenter is now the mainstream
+approach in industry, and self-hosting SonarQube (ADR-013) adds a workload that is heavy but
+*bursty* — exactly the shape static node groups handle worst.
+
+**Decision.** Adopt Karpenter. A minimal managed `system` node group hosts Karpenter itself
+and the control-plane-like platform components; Karpenter provisions all remaining capacity
+through spot-first NodePools with consolidation enabled.
+
+**Alternatives.** Static managed node groups + Cluster Autoscaler (simpler, but pays for idle
+capacity and cannot right-size to the pending pod). EKS Auto Mode (lowest operational burden,
+but carries a management-fee premium and hides the mechanics).
+
+**Consequences.** Karpenter bin-packs pending pods onto the cheapest instance that fits, and
+*consolidates* — terminating underutilised nodes and repacking. For a budget-constrained
+cluster with a bursty CI workload this typically saves 20–40% against static groups, and it is
+what makes self-hosted SonarQube affordable at all. It also replaces both the Cluster
+Autoscaler and the AWS Node Termination Handler: spot interruption is handled natively via an
+SQS queue.
+
+**The chicken-and-egg is real and is why a managed node group remains.** Karpenter is a
+Kubernetes controller and cannot provision the node it runs on. The `system` node group exists
+solely to break that cycle. At `min_size = 1` Karpenter is briefly unavailable if that node is
+lost — roughly 3–5 minutes while the managed node group replaces it; existing nodes are
+unaffected. `min_size = 2` removes this at +$70/mo, and is the first thing to buy with a
+budget increase.
+
+Additional moving parts: an `EC2NodeClass` (AMI family, subnet and security-group selectors,
+instance profile), one or more `NodePool` resources with disruption budgets, an IRSA role, and
+the SQS interruption queue with its EventBridge rules.
+
+**Revisit if:** operational complexity outweighs the savings, or EKS Auto Mode becomes
+cost-competitive.
+
+---
+
+## ADR-013 — Self-host SonarQube in-cluster
+
+**Date:** 2026-08-26 · **Status:** Accepted
+
+**Decision.** Run SonarQube Community Build in-cluster with a dedicated in-cluster PostgreSQL,
+rather than using SonarCloud.
+
+**Alternatives.** SonarCloud (SaaS, zero operational burden, free for public repositories —
+but these repositories are private, which is a paid tier).
+
+**Consequences.** This is the single heaviest addition to the platform. SonarQube embeds
+Elasticsearch and realistically needs ~1 vCPU / 3 GiB requested and ~2 vCPU / 4 GiB limit,
+plus a PostgreSQL instance and persistent volumes for data and extensions. It pushes the
+monthly cost to the top of the $150–250 band; Karpenter's consolidation (ADR-012) is what
+keeps it viable, since SonarQube is idle between analyses.
+
+**Two operational gotchas that must be handled at provisioning time, not discovered later:**
+
+1. Embedded Elasticsearch requires `vm.max_map_count = 262144` on the **host**. On EKS this is
+   set through the Karpenter `EC2NodeClass` userData or a privileged init container — it is not
+   a pod-level setting, and SonarQube crash-loops without it.
+2. It also requires a raised file-descriptor limit (`nofile` ≈ 131072).
+
+Its PostgreSQL runs in-cluster rather than on RDS deliberately: `db.t4g.micro` has 1 GiB of
+memory and cannot host both the application and SonarQube, and SonarQube's data is analysis
+history — losing it costs re-analysis, not money.
+
+**Revisit if:** cluster capacity becomes constrained, or SonarCloud's pricing changes.

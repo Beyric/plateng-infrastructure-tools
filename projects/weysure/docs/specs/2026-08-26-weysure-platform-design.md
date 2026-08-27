@@ -6,9 +6,9 @@
 | **Status** | Draft — awaiting review |
 | **Stage** | `brainstorm` → **`spec`** → `plan` → `implement` |
 | **Scope** | Greenfield production platform: AWS account → EKS → GitOps → CI → application delivery |
-| **Architecture diagrams** | [`docs/architecture/ARCHITECTURE.md`](../../architecture/ARCHITECTURE.md) |
-| **Build checklist** | [`docs/checklist/PLATFORM_BUILD_CHECKLIST.md`](../../checklist/PLATFORM_BUILD_CHECKLIST.md) |
-| **Decision records** | [`memory/DECISIONS.md`](../../../memory/DECISIONS.md) |
+| **Architecture diagrams** | [`docs/architecture/ARCHITECTURE.md`](../architecture/ARCHITECTURE.md) |
+| **Build checklist** | [`docs/checklist/PLATFORM_BUILD_CHECKLIST.md`](../checklist/BUILD_CHECKLIST.md) |
+| **Decision records** | [`memory/DECISIONS.md`](../../memory/DECISIONS.md) |
 
 ---
 
@@ -103,39 +103,50 @@ required. This is the single largest risk factor that this project does **not** 
 
 ## 3. Decisions
 
-Full rationale in [`memory/DECISIONS.md`](../../../memory/DECISIONS.md).
+Full rationale in [`memory/DECISIONS.md`](../../memory/DECISIONS.md).
 
 | ID | Decision |
 |---|---|
 | ADR-001 | Migrate the application database from Supabase to AWS RDS PostgreSQL |
 | ADR-002 | All infrastructure in `us-east-1`, with CloudFront edge mitigation for West African latency |
-| ADR-003 | Two managed node groups: `platform` (on-demand) and `workload` (spot) |
-| ADR-004 | Defer Linkerd; defer Karpenter; single NAT Gateway; single-AZ RDS |
+| ADR-003 | One managed `system` node group; `m6i` fixed-performance over burstable `t3` |
+| ADR-004 | Defer Linkerd; single NAT Gateway; single-AZ RDS |
 | ADR-005 | Four repositories; Jenkins is CI-only with zero cluster credentials |
 | ADR-006 | One cluster, two namespaces (`weysure-stage`, `weysure-prod`) |
 | ADR-007 | HashiCorp Vault OSS in-cluster with AWS KMS auto-unseal |
 | ADR-008 | External Secrets Operator rather than Vault Secrets Operator |
 | ADR-009 | IAM Identity Center (SSO) replaces static IAM user access keys |
 | ADR-010 | RDS `manage_master_user_password = true` — master password never enters Terraform state |
+| ADR-011 | Cloudflare for DNS and edge; Route 53 and CloudFront not used |
+| ADR-012 | Adopt Karpenter for node provisioning |
+| ADR-013 | Self-host SonarQube in-cluster |
 
 ---
 
 ## 4. Design
 
 The three design sections are documented with diagrams in
-[`ARCHITECTURE.md`](../../architecture/ARCHITECTURE.md). Summarised here.
+[`ARCHITECTURE.md`](../architecture/ARCHITECTURE.md). Summarised here.
 
 ### 4.1 Compute and network
 
-Two managed node groups. `platform` runs on-demand and hosts anything stateful or
-control-plane-like (Argo CD, Vault, Traefik, cert-manager, Jenkins controller). `workload`
-runs spot and hosts stateless application replicas, Prometheus, Kyverno, and ephemeral CI
-agents. Separation is enforced with node labels, `nodeAffinity`, taints and
-`PodDisruptionBudget`s, plus the AWS Node Termination Handler for graceful spot drains.
+A single managed `system` node group (1–2 × `m6i.large`, on-demand) hosts Karpenter itself,
+CoreDNS, and the control-plane-like platform components — Argo CD, Vault, Traefik,
+cert-manager, ESO. **Karpenter provisions everything else** through spot-first NodePools with
+consolidation enabled: application replicas, Prometheus, Kyverno, SonarQube, and ephemeral
+Jenkins agents.
 
-Instance family is `m6i`, **not `t3`**. Burstable instances throttle to a fraction of a vCPU
-once credits are exhausted; Prometheus scraping and CI builds exhaust them reliably, and the
-resulting slowdown presents as a mystery rather than an error.
+The managed node group exists to break a chicken-and-egg: Karpenter is a Kubernetes controller
+and cannot provision the node it runs on. Karpenter replaces both the Cluster Autoscaler and
+the AWS Node Termination Handler — spot interruption is handled natively via an SQS queue.
+
+Instance family is `m6i`, **not `t3`**. `t3` is burstable: it earns CPU credits while idle and
+sustains only 20–30% of a vCPU once they are exhausted. A Kubernetes node runs many always-on
+controllers plus bursty work (Prometheus scrapes, SonarQube analysis, image builds), which
+drains credits reliably. The resulting throttle presents as *unexplained slowness* rather than
+an error, which is expensive to diagnose. Under Karpenter the NodePool permits a family set
+(`m6i`, `m7i`, `m6a`, `m5`, `c6i`, `r6i`) and Karpenter selects the cheapest instance that
+fits the pending pods.
 
 #### Capacity analysis
 
@@ -148,22 +159,33 @@ schedule.
 Roughly 70% of that footprint is platform rather than product. That ratio is normal for a
 small platform and is the honest input to "should we run Kubernetes at all?"
 
-#### Cost model — approximately $244/month
+Self-hosted SonarQube (ADR-013) adds ~1 vCPU / 3 GiB requested plus its own PostgreSQL and
+persistent volumes — the heaviest single addition to the platform. Because SonarQube is idle
+between analyses, this is precisely the workload shape that static node groups handle worst
+and Karpenter handles best: capacity appears for an analysis and is consolidated away after.
+**Karpenter is what makes self-hosted SonarQube affordable at this budget.**
+
+#### Cost model — $240–270/month
 
 | Item | Choice | $/mo |
 |---|---|---|
 | EKS control plane | fixed, unavoidable | 73 |
-| `platform` node group | 1 × m6i.large on-demand | 70 |
-| `workload` node group | 1 × m6i.large spot (max 3) | 22 |
+| `system` node group | 1 × m6i.large on-demand | 70 |
+| Karpenter-provisioned | spot, consolidating — 1–2 × m6i.large equivalent | 22–48 |
 | NAT Gateway | 1, single AZ | 33 |
 | S3 Gateway VPC Endpoint | **free** — removes NAT charges on image pulls | 0 |
 | Network Load Balancer | 1, for Traefik | 18 |
 | RDS `db.t4g.micro` + 20 GB gp3 | single-AZ | 14 |
-| EBS volumes (PVs) | ~40 GB gp3 | 4 |
-| ECR + Route 53 + data transfer | | ~10 |
-| **Total** | | **≈ 244** |
+| EBS volumes (PVs incl. SonarQube + Prometheus + Vault) | ~60 GB gp3 | 6 |
+| ECR + data transfer | | ~8 |
+| **Cloudflare** | free plan — DNS, CDN, WAF, DDoS | **0** |
+| **Route 53 / CloudFront** | not used (ADR-011) | **0** |
+| **Total** | | **240–270** |
 
-Prices are `us-east-1` on-demand and must be re-verified at apply time.
+Prices are `us-east-1` on-demand and must be re-verified at apply time. The variable line is
+Karpenter capacity: the cluster consolidates toward the low end when SonarQube and CI are
+idle, and scales up during analysis or a deploy. Self-hosted SonarQube (ADR-013) is what
+pushes the top of this range against the $250 ceiling.
 
 ### 4.2 Repositories and GitOps
 
@@ -219,12 +241,12 @@ completion, and a rehearsed rollback.
 | # | Phase | Exit criteria | Spend |
 |---|---|---|---|
 | **0** | **Foundations & guardrails** | Both platform repos initialised with branch protection; Terraform migrated into `plateng-infrastructure-tools`; secrets purged; Gitleaks pre-commit active; IAM Identity Center live and `s_user` keys deleted; remote state verified | **$0** |
-| **1** | **Network & cluster** | VPC applied; EKS 1.31 reachable; **add-ons installed, IRSA provider created, access entries declared**; `kubectl get nodes` returns Ready nodes from a second identity | first spend |
-| **2** | **Cluster baseline** | StorageClass binds a test PVC; metrics-server serving; Traefik reachable via NLB; cert-manager issuing a real Let's Encrypt cert; external-dns writing Route 53 records | + LB |
+| **1** | **Network & cluster** | VPC applied; EKS 1.31 reachable; **add-ons installed, IRSA provider created, access entries declared**; `system` node group Ready; **Karpenter installed with `EC2NodeClass`, `NodePool` and SQS interruption queue**; a test deployment triggers Karpenter to provision and then consolidate a node | first spend |
+| **2** | **Cluster baseline** | StorageClass binds a test PVC; metrics-server serving; Namecheap NS delegated to Cloudflare; Traefik reachable via NLB; cert-manager issuing a real Let's Encrypt cert via Cloudflare DNS-01; external-dns writing Cloudflare records; NLB security group restricted to Cloudflare IP ranges | + LB |
 | **3** | **Data layer** | RDS applied with managed master password; Supabase→RDS migration **rehearsed**, verified, and cut over; Redis running; **restore drill completed** | + DB |
 | **4** | **Secrets** | Vault initialised with KMS auto-unseal; policies and Kubernetes auth configured; database engine issuing 1-hour credentials; ESO syncing; Reloader restarting on change; Raft snapshots to S3 | — |
 | **5** | **GitOps** | Argo CD self-managing; app-of-apps reconciling all platform components; drift detection alerting; `git revert` rollback demonstrated | — |
-| **6** | **CI** | Jenkins on ephemeral agents; Gitleaks, SonarQube, tests, Trivy all gating; image pushed via IRSA; tag commit to `plateng-gitops`; **no cluster credentials anywhere** | — |
+| **6** | **CI** | Jenkins on ephemeral agents; **SonarQube self-hosted with its PostgreSQL and `vm.max_map_count` handled**; Gitleaks, tests, Trivy all gating; image pushed via IRSA; tag commit to `plateng-gitops`; **no cluster credentials anywhere** | — |
 | **7** | **Application delivery** | Helm charts for API and web; probes, HPA, PDB, resource limits; migrations as an Argo CD PreSync hook (Finding ⑨); frontend Dockerfile with `output: "standalone"` | — |
 | **8** | **Policy** | Kyverno enforcing baseline policies; default-deny NetworkPolicies; ResourceQuota per namespace | — |
 | **9** | **Observability** | Prometheus, Grafana, Alertmanager, Blackbox; RED/USE dashboards; alerts routed and **tested by inducing failure** | — |
@@ -248,11 +270,11 @@ December 2021.
 | Pillar | Addressed by | Accepted gaps |
 |---|---|---|
 | **Operational Excellence** | IaC throughout; GitOps with git-as-audit-log; ADRs; runbooks per phase; SOPs on completion | Observability not present until Phase 9 |
-| **Security** | Nodes in private subnets only; RDS not publicly accessible; encryption at rest; SSO with 1-hour sessions; IRSA least privilege; **no standing DB password**; CI holds no cluster credentials; Gitleaks + Trivy + SonarQube gating; Kyverno; default-deny NetworkPolicy | Two documented manual bootstrap secrets |
+| **Security** | Nodes in private subnets only; **NLB reachable only from Cloudflare IP ranges**; RDS not publicly accessible; encryption at rest; SSO with 1-hour sessions; IRSA least privilege; **no standing DB password**; CI holds no cluster credentials; Gitleaks + Trivy + SonarQube gating; Kyverno; default-deny NetworkPolicy; Cloudflare WAF and DDoS | Two documented manual bootstrap secrets; Cloudflare API token to rotate |
 | **Reliability** | Subnets across 2 AZs; managed node group self-healing; on-demand baseline for stateful workloads; PDBs; RDS PITR with **rehearsed** restore; Vault Raft snapshots | **Single NAT Gateway (egress SPOF)**; single-AZ RDS; one cluster for both environments; single-replica Vault |
-| **Performance Efficiency** | Non-burstable `m6i` over `t3`; Redis for hot reads; CloudFront edge termination; HPA; capacity modelled against actual requests | Load testing deferred to Phase 10 |
-| **Cost Optimization** | Spot for elastic workloads; free S3 gateway endpoint; scale-to-zero CI agents; Linkerd deferred; cost modelled before build | Karpenter, NAT instance, Graviton deferred to Phase 10 |
-| **Sustainability** | Spot consumes otherwise-idle capacity; right-sizing over over-provisioning; scale-to-zero CI | Graviton (~60% less energy per unit work) deferred |
+| **Performance Efficiency** | Non-burstable `m6i` over `t3`; Redis for hot reads; **Cloudflare Lagos PoP edge termination**; Karpenter right-sizing to the pending pod; HPA; capacity modelled against actual requests | Load testing deferred to Phase 10 |
+| **Cost Optimization** | **Karpenter consolidation and spot-first NodePools**; free S3 gateway endpoint; **Cloudflare free edge instead of paid CloudFront**; scale-to-zero CI agents; Linkerd deferred; cost modelled before build | NAT instance and Graviton deferred to Phase 10 |
+| **Sustainability** | Spot consumes otherwise-idle capacity; **Karpenter consolidation terminates underutilised nodes automatically**; scale-to-zero CI; edge caching reduces origin traffic | Graviton (~60% less energy per unit work) deferred |
 
 The Reliability row names three structural weaknesses. That is intentional: a
 Well-Architected review that finds nothing is a review that was not performed.
@@ -263,7 +285,7 @@ Well-Architected review that finds nothing is a review that was not performed.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Database migration data loss | Low | **Severe** — escrow balances | Rehearse before executing; row-count and checksum verification; Supabase retained read-only for rollback |
+| Database migration data loss | Low | **Low** — *no live users or real money yet* | Rehearse before executing; row-count and checksum verification; Supabase retained read-only for rollback. Risk drops sharply because there is no production traffic to lose |
 | EKS lockout on first apply | Medium | High | Access entries declared in Terraform; verified from a second identity before proceeding |
 | Cost overrun | Medium | Medium | Budget alarms in Phase 0; cost reviewed at each phase gate |
 | Spot reclaim during a deploy | Medium | Low | On-demand baseline for stateful; PDBs; Node Termination Handler |
@@ -272,10 +294,16 @@ Well-Architected review that finds nothing is a review that was not performed.
 
 ---
 
-## 8. Open questions
+## 8. Resolved questions
 
-| # | Question | Blocks |
-|---|---|---|
-| 1 | Which domain name will the platform use, and where is it registered? No Route 53 hosted zone exists. | Phase 2 |
-| 2 | Does the platform currently serve live users and real money, or is this a pre-launch cutover? Changes the migration window and rollback posture. | Phase 3 |
-| 3 | Is SonarQube self-hosted in-cluster (adds ~1 vCPU / 2 GiB and a database) or SonarCloud (SaaS, free for private repos on a limited tier)? Materially affects Phase 6 capacity. | Phase 6 |
+All three questions that previously blocked Phases 2, 3 and 6 are answered.
+
+| # | Question | Answer | Consequence |
+|---|---|---|---|
+| 1 | Domain and DNS | `beyrictech.com`, registered at Namecheap, DNS delegated to **Cloudflare**. Production: `weysure.beyrictech.com` and `weysure-api.beyrictech.com`; staging on `-stage` variants | Route 53 and CloudFront dropped entirely (ADR-011). `external-dns` and `cert-manager` use the Cloudflare provider with a scoped API token in Vault. Cloudflare's free edge becomes the latency mitigation for ADR-002 |
+| 2 | Live users / real money | **No** — pre-launch | Migration risk drops from severe to low. The cutover needs correctness, not a ceremonial maintenance window. Rehearsal still happens: rehearsing when it is cheap is how the procedure is trustworthy when it is not |
+| 3 | SonarQube | **Self-hosted in-cluster** with its own in-cluster PostgreSQL | Heaviest single addition (ADR-013). Requires `vm.max_map_count = 262144` on the host via Karpenter `EC2NodeClass` userData, and a raised file-descriptor limit. Pushes cost to the top of the band |
+
+### Open questions
+
+None currently blocking. New questions will be recorded here as phases begin.
