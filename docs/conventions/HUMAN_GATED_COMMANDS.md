@@ -1,11 +1,24 @@
 # Human-gated commands
 
-**Standing rule: Adebayo runs every state-mutating command himself.**
+**Standing rule: Adebayo runs every `aws`, `terraform`, `kubectl`, `helm` and `argocd`
+command that changes state — plus anything else that mutates a running system.**
 
 An assistant or agent prepares the command — exact text, working directory, expected output,
-and what to check afterwards — and then stops. It does not run it. This is a learning
-requirement as much as a safety one: fluency with these commands is the point, and you do not
-build fluency watching someone else type.
+and what to check afterwards — and then stops. It does not run it.
+
+The line is drawn by **what builds fluency**, not only by what is dangerous. Adebayo is already
+fluent in git and ordinary shell work, so an agent runs those directly rather than narrating
+them. The cloud and cluster toolchains are the ones being learned, and you do not learn a
+command by watching someone else type it.
+
+| Toolchain | Who runs it | Why |
+|---|---|---|
+| `git`, shell (`ls`, `grep`, `sed`, `find`, `mv`) | **Agent** | Already fluent; narrating these is friction, not teaching |
+| `aws`, `terraform`, `kubectl`, `helm`, `argocd` — **mutating** | **Adebayo** | Being learned, and mistakes cost real money or real uptime |
+| `aws`, `terraform`, `kubectl`, `helm` — **read-only** | Agent | Investigation should be fast; nothing is at risk |
+
+An agent still never force-pushes, never rewrites shared history, and never deletes a branch
+it did not create.
 
 ## Always human-run
 
