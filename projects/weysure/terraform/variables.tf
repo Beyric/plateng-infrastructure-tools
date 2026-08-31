@@ -1,6 +1,7 @@
 variable "region" {
-  type    = string
-  default = "us-east-1"
+  description = "AWS region. Baked into every resource ARN — changing it means rebuilding (ADR-002)."
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "environment" {
@@ -14,8 +15,14 @@ variable "project" {
 }
 
 variable "vpc_cidr" {
-  type    = string
-  default = "10.0.0.0/16"
+  description = "Cannot be changed after creation without recreating the VPC."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "availability_zones" {
+  type    = list(string)
+  default = ["us-east-1a", "us-east-1b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -24,46 +31,34 @@ variable "public_subnet_cidrs" {
 }
 
 variable "private_subnet_cidrs" {
-  type    = list(string)
-  default = ["10.0.3.0/24", "10.0.4.0/24"]
+  description = "Worker nodes live here only. Nothing in the cluster is directly internet-reachable."
+  type        = list(string)
+  default     = ["10.0.3.0/24", "10.0.4.0/24"]
 }
 
-variable "availability_zones" {
-  type    = list(string)
-  default = ["us-east-1a", "us-east-1b"]
-}
-
-variable "eks_node_instance_type" {
+variable "kubernetes_version" {
   type    = string
-  default = "t3.medium"
+  default = "1.31"
 }
 
-variable "eks_node_min" {
+variable "system_node_instance_type" {
+  description = "Fixed-performance, not burstable. t3 throttles to 20-30% of a vCPU once credits run out, which presents as unexplained slowness rather than an error (ADR-003)."
+  type        = string
+  default     = "m6i.large"
+}
+
+variable "system_node_min" {
   type    = number
   default = 1
 }
 
-variable "eks_node_max" {
+variable "system_node_max" {
+  description = "Karpenter provisions everything else; this group only hosts Karpenter itself and the control-plane-like platform components."
+  type        = number
+  default     = 2
+}
+
+variable "system_node_desired" {
   type    = number
-  default = 3
-}
-
-variable "eks_node_desired" {
-  type    = number
-  default = 2
-}
-
-variable "db_instance_class" {
-  type    = string
-  default = "db.t3.micro"
-}
-
-variable "db_name" {
-  type    = string
-  default = "weysure"
-}
-
-variable "db_username" {
-  type    = string
-  default = "weysure_admin"
+  default = 1
 }
