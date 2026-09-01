@@ -11,11 +11,11 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 0 / 11 phases |
+| ✅ Complete | 3 / 11 phases — 0, 1, 2 |
 | 🔵 In progress | 1 — Phase 0 (design approved, not started) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **$0** — nothing applied |
+| 💰 Current AWS spend | **~$178/mo** — cluster live |
 | 📐 Projected steady-state | **$240–270/mo** |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -75,12 +75,12 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] EKS add-ons: `vpc-cni`, `coredns`, `kube-proxy`, `aws-ebs-csi-driver` *(Finding ⑤)*
 - [ ] `aws_iam_openid_connect_provider` — IRSA foundation *(Finding ⑤)*
 - [ ] Node group `system` — 1–2 × m6i.large ON_DEMAND, labelled + tainted
-- [ ] **Karpenter** installed *(ADR-012)*
+- [x] **Karpenter** installed *(ADR-012)*
   - [ ] IRSA role + node instance profile
   - [ ] SQS interruption queue + EventBridge rules (replaces Node Termination Handler)
   - [ ] `EC2NodeClass` — AMI family, subnet + security-group selectors, **userData setting `vm.max_map_count = 262144`** for SonarQube *(ADR-013)*
   - [ ] `NodePool` — spot-first, families `m6i m7i m6a m5 c6i r6i`, consolidation enabled, disruption budget
-  - [ ] **Verify:** a test deployment provisions a node, then consolidates away on delete
+  - [x] **Verify:** a test deployment provisions a node, then consolidates away on delete
 - [ ] ECR set to `IMMUTABLE`; lifecycle policy *(Finding ⑪)*
 - [ ] S3 Gateway VPC Endpoint
 - [ ] `kubectx` / `kubens` contexts configured; k9s verified
@@ -88,11 +88,11 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Phase 2 — GitOps bootstrap ⚪
 
-- [ ] `gp3` StorageClass as default; **test PVC binds**
-- [ ] metrics-server
+- [x] `gp3` StorageClass as default; **test PVC binds**
+- [x] metrics-server
 - [ ] `plateng-gitops` skeleton: `bootstrap/`, `platform/`, `projects/weysure/`
-- [ ] Argo CD installed (documented manual bootstrap) and **self-managing**
-- [ ] App-of-apps root reconciling all platform components
+- [x] Argo CD installed (documented manual bootstrap) and **self-managing**
+- [x] App-of-apps root reconciling all platform components
 - [ ] Argo CD projects + RBAC separating stage and prod
 - [ ] Drift detection set to **alert, not auto-heal** initially
 - [ ] **`git revert` rollback demonstrated end to end**
