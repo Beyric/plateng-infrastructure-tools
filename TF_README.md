@@ -17,3 +17,8 @@
 
 # Apply
 ## cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform && terraform apply tfplan
+## aws eks update-kubeconfig --region us-east-1 --name weysure-prod && kubectl get nodes -o wide && kubectl get pods -A
+
+## cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform && export AWS_PROFILE=beyric-admin && terraform plan -out=tfplan -replace='module.eks.aws_eks_addon.this["aws-ebs-csi-driver"]'
+## terraform apply tfplan
+## kubectl get pods -n kube-system -l app=ebs-csi-controller
