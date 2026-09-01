@@ -85,7 +85,17 @@ module "eks" {
     eks-pod-identity-agent = { before_compute = true }
     kube-proxy             = {}
     vpc-cni                = { before_compute = true }
-    aws-ebs-csi-driver     = {}
+    aws-ebs-csi-driver = {
+      # The controller calls EC2 to create and attach volumes, so it needs an
+      # AWS identity. enable_irsa below creates the OIDC provider - the trust
+      # anchor - but grants nothing on its own. Without this association the
+      # controller crash-loops on "no EC2 IMDS role found" and the add-on never
+      # reaches ACTIVE.
+      pod_identity_association = [{
+        role_arn        = aws_iam_role.ebs_csi.arn
+        service_account = "ebs-csi-controller-sa"
+      }]
+    }
   }
 
   # Finding ⑤: the OIDC provider that makes IRSA possible at all.
@@ -110,6 +120,36 @@ module "eks" {
     # Karpenter finds the cluster security group through this tag.
     "karpenter.sh/discovery" = local.cluster_name
   })
+}
+
+################################################################################
+# EBS CSI driver identity
+################################################################################
+
+# Pod Identity rather than IRSA: the trust policy is a fixed two-line document
+# instead of an OIDC condition that has to name the exact cluster issuer, and
+# it survives cluster recreation. IRSA remains available for workloads whose
+# Helm charts only support it.
+data "aws_iam_policy_document" "ebs_csi_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ebs_csi" {
+  name               = "${local.cluster_name}-ebs-csi"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_assume.json
+  tags               = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role       = aws_iam_role.ebs_csi.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 }
 
 ################################################################################
