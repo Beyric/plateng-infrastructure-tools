@@ -46,3 +46,12 @@ output "configure_kubectl" {
   description = "Credentials come from AWS_PROFILE in the environment (ADR-017)."
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
+
+output "vault_kms_key_id" {
+  description = "Referenced by the Vault Helm values seal stanza in plateng-gitops."
+  value       = aws_kms_key.vault_unseal.key_id
+}
+
+output "vault_snapshot_bucket" {
+  value = aws_s3_bucket.vault_snapshots.id
+}
