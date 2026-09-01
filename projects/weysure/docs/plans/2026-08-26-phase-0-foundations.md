@@ -172,6 +172,30 @@ exists — it auto-requests review on a PR but enforces nothing.
 **Blocks:** nothing immediately — but it must be resolved before Phase 2 wires Argo CD to
 `plateng-gitops`, because from that moment a push to `main` is a production deployment.
 
+### Finding ⑳ — Default StorageClass uses the deprecated in-tree provisioner
+
+`kubectl get storageclass` after Phase 1 shows exactly one class:
+
+```
+gp2   kubernetes.io/aws-ebs   Delete   WaitForFirstConsumer   (default)
+```
+
+`kubernetes.io/aws-ebs` is the **in-tree** provisioner, removed from Kubernetes upstream and
+retained only for compatibility. The `aws-ebs-csi-driver` add-on is ACTIVE and
+`ebs.csi.aws.com` is registered, but **nothing routes to it** — a PVC created today would use
+the legacy path and never touch the driver we installed.
+
+Also note `gp2` is the older volume type: `gp3` is roughly 20% cheaper per GiB and delivers a
+guaranteed 3,000 IOPS baseline rather than IOPS scaled to volume size.
+
+**Fix in Phase 2:** create a `gp3` StorageClass with `provisioner: ebs.csi.aws.com`, mark it
+default, and remove the default annotation from `gp2`. Deliberately **not** fixed by hand with
+`kubectl` — StorageClasses are Kubernetes objects and belong in `plateng-gitops`, or the
+imperative drift starts on day one.
+
+**Verification that closes it:** a test PVC must reach `Bound`, and `kubectl get pv` must show
+the volume was provisioned by `ebs.csi.aws.com`.
+
 ### Triaged as NOT exposures
 
 Checking these was the point of triage; scanning without it produces noise that gets ignored.
