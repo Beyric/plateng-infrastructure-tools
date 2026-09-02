@@ -1,5 +1,7 @@
 locals {
-  cluster_name = "${var.project}-${var.environment}"
+  # ADR-018: the cluster is organisation-scoped. Products are namespaces within it,
+  # so naming it for one product would be wrong the moment a second one arrives.
+  cluster_name = "${var.organisation}-${var.environment}"
 
   # Karpenter discovers subnets and security groups by tag rather than by id,
   # so it can provision nodes without Terraform knowing about them.

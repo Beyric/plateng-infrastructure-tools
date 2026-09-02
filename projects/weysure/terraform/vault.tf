@@ -32,7 +32,7 @@ resource "aws_kms_alias" "vault_unseal" {
 ################################################################################
 
 resource "aws_s3_bucket" "vault_snapshots" {
-  bucket = "${var.project}-vault-snapshots-${data.aws_caller_identity.current.account_id}"
+  bucket = "${var.organisation}-vault-snapshots-${data.aws_caller_identity.current.account_id}"
   tags   = local.tags
 }
 
