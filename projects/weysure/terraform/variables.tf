@@ -4,14 +4,21 @@ variable "region" {
   default     = "us-east-1"
 }
 
+variable "organisation" {
+  description = "Owns the cluster and the AWS account. Products live inside it as namespaces (ADR-018)."
+  type        = string
+  default     = "beyric"
+}
+
 variable "environment" {
   type    = string
   default = "prod"
 }
 
 variable "project" {
-  type    = string
-  default = "weysure"
+  description = "Scopes product-specific resources only - ECR repositories, namespaces, Vault KV paths.\nNever the cluster: see ADR-018."
+  type        = string
+  default     = "weysure"
 }
 
 variable "vpc_cidr" {

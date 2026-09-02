@@ -465,3 +465,57 @@ failure mode.
 machine keeps it*. A `profile` is a local lookup key, not a property of the infrastructure.
 
 **Revisit if:** never — this is the standard pattern.
+
+---
+
+## ADR-018 — The cluster is named for the organisation, not the product
+
+**Date:** 2026-09-02 · **Status:** Accepted · **Corrects** an error in ADR-006's implementation
+
+**Context.** ADR-006 decided one cluster hosting multiple environments as namespaces. The
+implementation named it `local.cluster_name = "${var.project}-${var.environment}"`, producing
+**`weysure-prod`**. Adebayo caught the contradiction while asking whether a second product would
+need its own Vault: if Luran shares this cluster, a cluster called `weysure-prod` is simply
+wrong, and it is wrong in the same way the budget named `weysure-platform-monthly` was wrong
+for an account-wide budget.
+
+**Decision.** The cluster is **`beyric-prod`** — organisation plus environment. Products are
+namespaces within it.
+
+**Why this could not be deferred.** An EKS cluster cannot be renamed. The name is an identifier,
+not an attribute: it appears in the cluster ARN, the OIDC issuer URL, every access entry, the
+Karpenter `karpenter.sh/discovery` tags, the node group name, the KMS alias, the snapshot
+bucket, and every IAM role. Changing it is destroy-and-recreate.
+
+| | Now | After anything real depends on it |
+|---|---|---|
+| Cost | ~25 minutes; the cluster holds nothing | Migrate Vault data, re-issue certificates, rebuild CI, redeploy every workload |
+
+This is the fourth instance of the same pattern in this build — the state bucket rename, the ECR
+immutability flip, the database migration, and now this. Each was nearly free at the moment it
+was noticed and would have become expensive the moment something real depended on it.
+Infrastructure decisions have a cost curve that is flat and then vertical, and the inflection is
+the arrival of real dependents.
+
+**Alternatives.** A cluster per product (correct isolation, but +$73/month control plane each,
+which the budget does not carry — and ADR-006 already rejected it). Keeping the name and sharing
+anyway (free, and misleads every future reader — the "temporary" name nobody ever fixes).
+
+**Consequences.** Everything derived from the cluster name changes with it, so the rename is
+mechanical rather than fiddly. The Vault instance is destroyed and re-initialised, which
+invalidates the recovery keys stored minutes earlier under
+`platform/vault/recovery-keys` — that secret is overwritten after the rebuild.
+
+Naming convention going forward, consistent with ADR-015 and ADR-016:
+
+| Thing | Scope | Example |
+|---|---|---|
+| AWS account resources | organisation | `beyric-tfstate-767397877316` |
+| SSO profile | account + permission set | `beyric-admin` |
+| Cluster | organisation + environment | `beyric-prod` |
+| Budget | account | `aws-account-total-monthly` |
+| Namespace | product + environment | `weysure-prod`, `luran-prod` |
+| Vault KV path | product | `secret/weysure/*`, `secret/luran/*` |
+
+**Revisit if:** a product needs hard isolation that namespaces cannot provide — a compliance
+boundary, or a noisy-neighbour problem quotas fail to contain.
