@@ -41,3 +41,7 @@ modules/**/.terraform.lock.hcl
 
 # Subagent working notes — task briefs, reports and the run ledger
 .superpowers/
+
+# Terraform plan files - binary, churn every plan, and can carry sensitive values
+tfplan
+*.tfplan
