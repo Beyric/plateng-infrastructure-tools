@@ -55,3 +55,13 @@ output "vault_kms_key_id" {
 output "vault_snapshot_bucket" {
   value = aws_s3_bucket.vault_snapshots.id
 }
+
+output "rds_endpoint" {
+  description = "host:port. Vault's database engine and the bootstrap Job connect here."
+  value       = module.rds.db_instance_endpoint
+}
+
+output "rds_master_secret_arn" {
+  description = "Secrets Manager ARN of the RDS-managed master password. Break-glass only."
+  value       = module.rds.db_instance_master_user_secret_arn
+}

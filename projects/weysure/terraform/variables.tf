@@ -69,3 +69,9 @@ variable "system_node_desired" {
   type    = number
   default = 1
 }
+
+variable "db_instance_class" {
+  description = "Graviton, single-AZ. Multi-AZ doubles this; revisit at the first paying-customer SLA (ADR-004)."
+  type        = string
+  default     = "db.t4g.micro"
+}
