@@ -11,11 +11,11 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 3 / 11 phases — 0, 1, 2 |
+| ✅ Complete | 5 / 11 phases — 0, 1, 2, 3, 4 · Phase 5 core done, restore drill deferred to 10 |
 | 🔵 In progress | 1 — Phase 0 (design approved, not started) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$178/mo** — cluster live |
+| 💰 Current AWS spend | **~$195/mo** — cluster + RDS + NLB |
 | 📐 Projected steady-state | **$240–270/mo** |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -143,9 +143,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 > Alembic revisions build the schema from scratch, which is the same path every fresh dev
 > environment already exercises. No dump, no cutover window, no rollback window.
 
-- [ ] RDS with `manage_master_user_password = true` *(ADR-010)*
-- [ ] Automated backups, PITR, 7-day retention
-- [ ] Redis deployed with a PVC
+- [x] RDS with `manage_master_user_password = true` *(ADR-010)*
+- [x] Automated backups, PITR, 7-day retention
+- [x] Redis deployed with a PVC
 - [ ] **Schema build** — `alembic upgrade head` against the empty RDS instance (47 revisions)
 - [ ] Verify every table, index and constraint the models expect actually exists
 - [ ] `DATABASE_URL` pointed at RDS, credentials issued by Vault *(ADR-007)*
