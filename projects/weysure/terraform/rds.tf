@@ -78,7 +78,11 @@ module "rds" {
   parameters = [
     # Force TLS. Vault and the app connect with sslmode=require, but this makes
     # a plaintext connection impossible rather than merely unlikely.
-    { name = "rds.force_ssl", value = "1" },
+    # apply_method must be declared as pending-reboot: rds.force_ssl is a static
+    # parameter in PostgreSQL 16, so AWS records it that way regardless of what
+    # is sent. Leaving the module default (immediate) produces a perpetual
+    # 1-change plan that never converges, which defeats the drift check.
+    { name = "rds.force_ssl", value = "1", apply_method = "pending-reboot" },
   ]
 
   tags = local.tags
