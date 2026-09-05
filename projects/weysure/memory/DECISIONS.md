@@ -519,3 +519,38 @@ Naming convention going forward, consistent with ADR-015 and ADR-016:
 
 **Revisit if:** a product needs hard isolation that namespaces cannot provide — a compliance
 boundary, or a noisy-neighbour problem quotas fail to contain.
+
+---
+
+## ADR-019 — ExternalSecrets use `dataFrom.extract`; one Vault path per consumer
+
+**Date:** 2026-09-04 · **Status:** Accepted · **Proposed by:** Adebayo
+
+**Context.** ExternalSecrets were written with `data[]`, enumerating each key and remapping
+it (`secretKey: jenkins-admin-user ← property: admin_user`). Adebayo challenged this: a new
+key in Vault requires a manifest edit before it is available, and the mapping is boilerplate
+that exists only because the manifest was teaching Vault the chart's key names.
+
+**Decision.** `dataFrom.extract` by default. Consumers reference Vault's key names directly.
+Retroactively applied to the Cloudflare token (Phase 4) and used for all CI secrets (Phase 6).
+
+**Why the pushback did not win, and what it bought.** Two objections were real and became
+guardrails rather than reasons to refuse:
+
+- `extract` is *allow-by-default* — every key at a path reaches every Secret reading it. The
+  first draft of Phase 6 had two ExternalSecrets on `platform/jenkins`; under `extract` the
+  webhook Secret would have carried the admin password. **Rule: one Vault path, one consumer.**
+- Removal is *silent* — a deleted Vault key vanishes from the Secret without an error, and the
+  pod fails on its next restart. Reloader restarts on change so it fails immediately; Phase 9
+  alerts on `Ready=False`. **Rule: deleting a Vault key is a change to a running workload.**
+
+The "no manifest edit" benefit is smaller than it first appears — a new key does nothing
+until a consumer references it, and that reference is a manifest edit — except with
+`envFrom`, where it is exactly as large as claimed. **Rule: `envFrom` only on app-owned paths.**
+
+**Consequences.** Less boilerplate; the store stays chart-agnostic; the consumer adapts to the
+store's naming, which is the right direction. In exchange, path scoping becomes a design
+decision that has to be made deliberately, and the convention document carries the rules.
+
+**Revisit if:** a path genuinely needs to serve multiple consumers with different subsets —
+that is the `data[]` case, and it should be rare.
