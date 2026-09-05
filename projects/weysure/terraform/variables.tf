@@ -66,8 +66,9 @@ variable "system_node_max" {
 }
 
 variable "system_node_desired" {
-  type    = number
-  default = 1
+  description = "Two, since Phase 6. One m6i.large reached 89% CPU reserved with Vault, Argo CD, Karpenter, CoreDNS and the EBS CSI controllers, and the Jenkins controller could not schedule. Two also means Karpenter and Argo CD survive the loss of a node (ADR-012)."
+  type        = number
+  default     = 2
 }
 
 variable "db_instance_class" {
