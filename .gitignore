@@ -2,9 +2,13 @@
 **/.terraform/*
 *.tfstate
 *.tfstate.*
-*.tfvars
-*.tfvars.json
-!example.tfvars
+# terraform.tfvars IS tracked (Finding 24): it holds sizing, not secrets. ADR-010
+# guarantees the database password never enters it. A gitignored tfvars silently
+# overrides git-tracked defaults on whichever machine it lives on, which is how
+# main stopped describing reality in Phase 6. Anything sensitive goes in a
+# *.secret.tfvars, which stays ignored.
+*.secret.tfvars
+*.secret.tfvars.json
 crash.log
 crash.*.log
 override.tf
