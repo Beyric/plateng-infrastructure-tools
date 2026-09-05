@@ -55,8 +55,9 @@ variable "system_node_instance_type" {
 }
 
 variable "system_node_min" {
-  type    = number
-  default = 1
+  description = "Two, since Phase 6. This is the value that actually sizes the group after creation: the EKS module ignores desired_size changes (lifecycle ignore_changes) so autoscalers can move it, which means only min_size and max_size are enforced by Terraform. Finding 25."
+  type        = number
+  default     = 2
 }
 
 variable "system_node_max" {
@@ -66,7 +67,7 @@ variable "system_node_max" {
 }
 
 variable "system_node_desired" {
-  description = "Two, since Phase 6. One m6i.large reached 89% CPU reserved with Vault, Argo CD, Karpenter, CoreDNS and the EBS CSI controllers, and the Jenkins controller could not schedule. Two also means Karpenter and Argo CD survive the loss of a node (ADR-012)."
+  description = "Applies at node-group CREATION only - the module ignores later changes to desired_size. Use system_node_min to size the group after it exists (Finding 25). One m6i.large reached 89% CPU reserved with Vault, Argo CD, Karpenter, CoreDNS and the EBS CSI controllers, and the Jenkins controller could not schedule. Two also means Karpenter and Argo CD survive the loss of a node (ADR-012)."
   type        = number
   default     = 2
 }
