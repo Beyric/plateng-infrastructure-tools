@@ -554,3 +554,29 @@ decision that has to be made deliberately, and the convention document carries t
 
 **Revisit if:** a path genuinely needs to serve multiple consumers with different subsets —
 that is the `data[]` case, and it should be rare.
+
+## ADR-020 — CI commits straight to gitops `main` under a ruleset bypass
+
+**Date:** 2026-09-09 · **Status:** Accepted · **Proposed by:** Claude, approved by Adebayo
+
+**Context.** The Promote stage writes one line — an image tag — into
+`projects/weysure/environments/prod/images.yaml`. `main` on plateng-gitops is protected by a
+ruleset requiring a pull request. Either CI opens a PR per build that a human merges, or the
+GitHub App `beyric-ci` bypasses the ruleset for that push.
+
+**Decision.** Bypass, scoped to the App (`actor_type: Integration`). CI is the only actor with
+the bypass; humans still go through PRs.
+
+**Why.** A PR-per-build makes every deploy a manual click, which is the process Phase 6 was
+meant to remove, and the review would be of a SHA nobody can evaluate by reading it. The
+gate belongs *before* the image exists — gitleaks, tests, the Sonar gate, Trivy — and it does.
+The push is also auditable: the commit is authored by the App, is a one-line diff, and can
+be reverted like any other.
+
+**Consequences.** A compromised App key can move production to any image in ECR. Mitigations:
+the key lives only in Vault and the agent pod; ECR is `IMMUTABLE` so the tag names one
+image; Phase 8 adds Kyverno `verifyImages` so only CI-signed images admit. Until Phase 7 the
+push deploys nothing, so the blast radius today is a git revert.
+
+**Revisit if:** a second environment (`stage`) arrives — promote to `stage` directly, and
+gate `prod` behind a PR or an Argo CD sync window, per ADR-005's "promotion is a commit".

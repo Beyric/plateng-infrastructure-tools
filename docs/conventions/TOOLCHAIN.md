@@ -97,3 +97,14 @@ tflint --init
   restores the formula or tap, prefer `brew install tflint` again and delete this workaround
   section — Homebrew's tap update/audit trail is preferable to a manual release download when
   available.
+
+## Reproducing CI on macOS — what bites
+
+| Trap | Rule |
+|---|---|
+| `timeout` does not exist | `perl -e 'alarm 300; exec @ARGV' <cmd>` |
+| `PIPESTATUS` is bash | zsh: `${pipestatus[1]}` (lowercase) |
+| pydantic-settings reads the developer's `.env` — tests fail on keys CI never sees | run tests from a `git archive HEAD \| tar -x` copy: tracked files only, exactly the CI checkout |
+| Docker Desktop under-provisioned (2 CPU) stalls silently under `npm ci` and restarts itself, dropping pulled images | 4+ CPU / 6–8 GB (set 2026-09-09); check `docker info --format '{{.NCPU}} {{.MemTotal}}'` before blaming the network |
+| Trivy `cache may be in use by another process` | one scan at a time; `pkill -f 'trivy image'` if a background scan was killed |
+| Verifying a Dockerfile fix in-Docker takes 20 min of `npm ci` | build the *runtime stage only* from the host's `.next/standalone` with a scratch Dockerfile; scan and run that |
