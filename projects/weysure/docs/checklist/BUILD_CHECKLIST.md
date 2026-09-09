@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-08-26 (revised: Karpenter, Cloudflare, SonarQube)
+> **Last reconciled:** 2026-09-09 (Phase 6 complete)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -11,11 +11,11 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 5 / 11 phases — 0, 1, 2, 3, 4 · Phase 5 core done, restore drill deferred to 10 |
+| ✅ Complete | 6 / 11 phases — 0, 1, 2, 3, 4, 6 · Phase 5 core done, restore drill deferred to 10 |
 | 🔵 In progress | 1 — Phase 0 (design approved, not started) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$195/mo** — cluster + RDS + NLB |
+| 💰 Current AWS spend | **~$230/mo** — cluster (2 system nodes) + RDS + NLB + spot agents |
 | 📐 Projected steady-state | **$240–270/mo** |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -155,30 +155,32 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
 - [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
 
-## Phase 6 — CI ⚪
+## Phase 6 — CI ✅ *(2026-09-09 · [SOP](../sop/2026-09-09-phase-6-ci.md))*
 
-- [ ] Jenkins controller on the `platform` node group; ephemeral agents on spot
-- [ ] IRSA role for ECR push — **no AWS access keys anywhere** *(Finding ⑦)*
-- [ ] GitHub App (scoped) for the GitOps tag commit
-- [ ] Gitleaks stage *(Finding ⑦)*
-- [ ] **SonarQube self-hosted** *(ADR-013)*
-  - [ ] In-cluster PostgreSQL + PVC
-  - [ ] PVCs for SonarQube data and extensions
-  - [ ] **`vm.max_map_count = 262144` confirmed on the host** — SonarQube crash-loops without it
-  - [ ] File-descriptor limit raised (`nofile` ≈ 131072)
-  - [ ] Quality gate wired into the pipeline as a blocking stage
-- [ ] Test stage with coverage reporting
-- [ ] Trivy image scan stage
-- [ ] Build tagged by **git SHA only** — never `:latest` *(Finding ⑪)*
-- [ ] **Remove the non-existent `weysure-worker` stage** *(Finding ⑧)*
-- [ ] **Remove all `kubectl` usage from the Jenkinsfile** *(Finding ⑦)*
-- [ ] Frontend pipeline
-- [ ] SOP · runbooks · workflow `CI_CD_WORKFLOW.md` · diagram
+- [x] Jenkins controller on the system node group; ephemeral agents on spot *(gitops #11)*
+- [x] Pod identity for ECR push — **no AWS access keys anywhere** *(Finding ⑦, infra `ci.tf`)*
+- [x] GitHub App (scoped) for the GitOps tag commit *(ADR-020, Finding ㉗)*
+- [x] Gitleaks stage *(Finding ⑦)* — first runs found 46 + 28 issues; hygiene PRs API #6, web #2
+- [x] **SonarQube self-hosted** *(ADR-013)*
+  - [x] In-cluster PostgreSQL + PVC
+  - [x] PVCs for SonarQube data and extensions
+  - [x] `vm.max_map_count` / `nofile` — set by the chart's init container on the node
+  - [x] Quality gate wired into the pipeline as a blocking stage *(gitops #12 for the token)*
+- [x] Test stage — pytest against Postgres 16 + Redis 8.2 sidecars, junit *(API #8, #9; gitops #13)*
+  - [ ] Coverage reporting → Phase 7
+- [x] Trivy image scan stage — CRITICAL, `--ignore-unfixed`; three real CVEs caught *(web #4, #6; API #10)*
+- [x] Build tagged by **git SHA only** — never `:latest` *(Finding ⑪)*
+- [x] **Removed the non-existent `weysure-worker` stage** *(Finding ⑧)*
+- [x] **No `kubectl` in either Jenkinsfile** *(Finding ⑦)*
+- [x] Frontend pipeline *(web #1)*
+- [x] Promote → `images.yaml` on gitops `main`: `ca1f4d9` (api), `b62ccd9` (web) by `beyric-ci[bot]`
+- [x] SOP · Findings ㉕–㉚ · ADR-020
+- [ ] runbook `GITHUB_ACTIONS_FAILURE.md` → renamed `JENKINS_FAILURE.md`, Phase 10 · workflow `CI_CD_WORKFLOW.md` · diagram
 
 ## Phase 7 — Application delivery ⚪
 
 - [ ] Helm chart for `weysure-api`
-- [ ] Frontend Dockerfile + `output: "standalone"` *(Finding ⑩)*
+- [x] Frontend Dockerfile + `output: "standalone"` *(Finding ⑩, web #1; runtime hardened web #6)*
 - [ ] Helm chart for `weysure-web`
 - [ ] Liveness / readiness / startup probes
 - [ ] Resource requests and limits from measured usage
