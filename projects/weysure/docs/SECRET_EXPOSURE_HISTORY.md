@@ -53,7 +53,7 @@ gitleaks detect --source <repo> \
   independently of gitleaks:
 
 ```bash
-cd ~/Documents/dev/weysure/Weysure-API && git log --all --oneline --date=short --pretty=format:'%h %ad %s' -- .env
+cd ~/Documents/beyric/projects/weysure/Weysure-API && git log --all --oneline --date=short --pretty=format:'%h %ad %s' -- .env
 ```
 
   Result: **9 commits**, `52f89f2` (2025-07-07) through `6b2e901` (2026-03-25) — confirmed, not

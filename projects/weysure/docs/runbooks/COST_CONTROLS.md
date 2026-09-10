@@ -143,7 +143,7 @@ aws sso login --profile beyric-admin
 **Then re-run the dry run:**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 export AWS_PROFILE=beyric-admin
 terraform init
 terraform plan -out=/tmp/phase0-dryrun.tfplan
@@ -216,7 +216,7 @@ Then confirm `terraform.tfvars` never shows in `git status --short` (it is `.git
 Phase 0–1 only, and only when nothing stateful exists yet:
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 terraform destroy
 ```
 

@@ -57,7 +57,7 @@ Every handover states four things. A command without them is not ready to run.
 
 ### Example
 
-**Where:** `~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform`
+**Where:** `~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform`
 
 ```bash
 terraform apply tfplan
