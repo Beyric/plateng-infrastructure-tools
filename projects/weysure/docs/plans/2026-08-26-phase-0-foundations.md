@@ -41,10 +41,10 @@ do not leave the literal placeholder in a command you run.
   - `innocent98/Weysure-API` — FastAPI backend, default branch `main`
   - `innocent98/Weysure` — Next.js frontend, default branch `main`
 - **Local paths:**
-  - `~/Documents/plateng-infra/plateng-infrastructure-tools`
-  - `~/Documents/plateng-infra/plateng-gitops`
-  - `~/Documents/plateng-infra/weysure-infrastructure` — legacy Terraform, source for the migration
-  - `~/Documents/dev/weysure/Weysure-API`, `~/Documents/dev/weysure/Weysure`
+  - `~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools`
+  - `~/Documents/beyric/projects/plateng-infra/plateng-gitops`
+  - `~/Documents/beyric/projects/plateng-infra/weysure-infrastructure` — legacy Terraform, source for the migration
+  - `~/Documents/beyric/projects/weysure/Weysure-API`, `~/Documents/beyric/projects/weysure/Weysure`
 
 ---
 
@@ -263,7 +263,7 @@ rather than from `kubectl create secret`.
 - [ ] **Step 1: Confirm the contradiction exists**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 grep -n 'Argo CD' projects/weysure/docs/specs/2026-08-26-weysure-platform-design.md | grep -E '^\s*[0-9]+:\| \*\*[0-9]'
 ```
 
@@ -346,7 +346,7 @@ is installed by Argo CD, so it cannot supply the credential Argo CD needs to fin
 - [ ] **Step 6: Verify no stale phase references remain**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 grep -rn 'Phase 5' projects/weysure/docs/specs projects/weysure/docs/checklist | grep -i 'gitops\|argo'
 ```
 
@@ -360,7 +360,7 @@ cd /tmp && rm -rf mmcheck && mkdir mmcheck && cd mmcheck
 printf '{"args":["--no-sandbox"]}' > pc.json
 python3 -c "
 import re,pathlib
-src=pathlib.Path('$HOME/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/docs/architecture/ARCHITECTURE.md').read_text()
+src=pathlib.Path('$HOME/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/docs/architecture/ARCHITECTURE.md').read_text()
 for i,b in enumerate(re.findall(r'\`\`\`mermaid\n(.*?)\`\`\`',src,re.S),1):
     pathlib.Path(f'd{i:02d}.mmd').write_text(b)
 "
@@ -373,7 +373,7 @@ Expected: `rendered: 10 / 10`
 - [ ] **Step 8: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add projects/weysure/docs projects/weysure/memory
 git commit -m "docs(platform): reorder phases so GitOps and Secrets precede Ingress
 
@@ -498,7 +498,7 @@ exemptions work. Test all four cases:
 | `projects/weysure/docs/CANARY.md` | a synthetic private-key block, assembled at runtime | **1** — proves docs are still scanned |
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 printf 'password = "NotARealPasswordButLooksLikeOne123"\n' > canary.tf
 printf 'db_password = "NotARealPasswordButLooksLikeOne123"\n' > canary.tfvars
 printf 'db_password = "CHANGEME"\ntoken = "REPLACE_ME"\n' > placeholders.tfvars
@@ -581,7 +581,7 @@ plugin "aws" {
 - [ ] **Step 9: Install the hooks and TFLint plugins**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 pre-commit install
 tflint --init
 ```
@@ -600,10 +600,10 @@ exist yet — that is correct at this point; Task 4 exercises them.
 - [ ] **Step 11: Scan the full history of all four repositories**
 
 ```bash
-for R in ~/Documents/plateng-infra/plateng-infrastructure-tools \
-         ~/Documents/plateng-infra/plateng-gitops \
-         ~/Documents/dev/weysure/Weysure-API \
-         ~/Documents/dev/weysure/Weysure; do
+for R in ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools \
+         ~/Documents/beyric/projects/plateng-infra/plateng-gitops \
+         ~/Documents/beyric/projects/weysure/Weysure-API \
+         ~/Documents/beyric/projects/weysure/Weysure; do
   echo "═══ $(basename $R) ═══"
   gitleaks detect --source "$R" --redact --exit-code 0 --report-format json --report-path "/tmp/gl-$(basename $R).json" 2>&1 | tail -3
   python3 -c "
@@ -621,7 +621,7 @@ is Finding ⑯ and Task 3 handles it. Record the counts; do not print values.
 - [ ] **Step 12: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add .gitleaks.toml .pre-commit-config.yaml .tflint.hcl
 git commit -m "chore(security): add gitleaks, pre-commit and tflint configuration
 
@@ -655,7 +655,7 @@ future exposure but cannot un-disclose a credential that has already been readab
 - [ ] **Step 1: Confirm the exposure and list affected key names**
 
 ```bash
-cd ~/Documents/dev/weysure/Weysure-API
+cd ~/Documents/beyric/projects/weysure/Weysure-API
 git show 52f89f2:.env | grep -oE '^[A-Z_]+' | sort -u
 ```
 
@@ -711,7 +711,7 @@ been readable must be treated as disclosed, regardless of who you believe had ac
 ## Verification
 
 ```bash
-cd ~/Documents/dev/weysure/Weysure-API
+cd ~/Documents/beyric/projects/weysure/Weysure-API
 docker compose up -d && sleep 15
 curl -fsS http://localhost:8000/api/v1/health && echo " health OK"
 docker compose logs api --tail 30 | grep -iE 'error|traceback' || echo "no errors in startup log"
@@ -724,7 +724,7 @@ containment. If performed:
 
 ```bash
 brew install git-filter-repo
-cd ~/Documents/dev/weysure/Weysure-API
+cd ~/Documents/beyric/projects/weysure/Weysure-API
 git filter-repo --path .env --invert-paths --force
 git push --force --all && git push --force --tags
 ```
@@ -748,7 +748,7 @@ in any chat transcript.
 - [ ] **Step 4: Verify the application still starts**
 
 ```bash
-cd ~/Documents/dev/weysure/Weysure-API
+cd ~/Documents/beyric/projects/weysure/Weysure-API
 docker compose up -d && sleep 15
 curl -fsS http://localhost:8000/api/v1/health && echo " health OK"
 ```
@@ -769,7 +769,7 @@ findings table in §2:
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add projects/weysure/docs/runbooks/SECRET_ROTATION.md projects/weysure/docs/specs
 git commit -m "docs(security): add secret rotation runbook and record findings 15 and 16
 
@@ -789,7 +789,7 @@ hygiene, not containment."
 ## Task 4: Migrate Terraform into this repository
 
 Resolves Findings ①, ②, ⑪ and ⑮. The legacy configuration at
-`~/Documents/plateng-infra/weysure-infrastructure` is not a git repository, contains a plaintext
+`~/Documents/beyric/projects/plateng-infra/weysure-infrastructure` is not a git repository, contains a plaintext
 password, and does not parse.
 
 **Files:**
@@ -807,7 +807,7 @@ password, and does not parse.
 - [ ] **Step 1: Prove the source does not parse (the failing test)**
 
 ```bash
-terraform fmt -check -recursive ~/Documents/plateng-infra/weysure-infrastructure
+terraform fmt -check -recursive ~/Documents/beyric/projects/plateng-infra/weysure-infrastructure
 ```
 
 Expected: `Error: Invalid single-argument block definition` at `modules/rds/variables.tf` line 9.
@@ -815,8 +815,8 @@ Expected: `Error: Invalid single-argument block definition` at `modules/rds/vari
 - [ ] **Step 2: Copy the tree, excluding secrets and state**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
-SRC=~/Documents/plateng-infra/weysure-infrastructure
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
+SRC=~/Documents/beyric/projects/plateng-infra/weysure-infrastructure
 mkdir -p modules projects/weysure/terraform
 cp -R "$SRC/modules/vpc" "$SRC/modules/eks" "$SRC/modules/rds" modules/
 cp "$SRC"/versions.tf "$SRC"/variables.tf "$SRC"/main.tf "$SRC"/outputs.tf projects/weysure/terraform/
@@ -942,7 +942,7 @@ db_instance_class      = "db.t4g.micro"
 - [ ] **Step 10: Verify it now parses and is formatted**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 terraform fmt -recursive .
 terraform fmt -check -recursive . && echo "fmt clean"
 ```
@@ -952,7 +952,7 @@ Expected: `fmt clean`, no errors.
 - [ ] **Step 11: Verify it validates**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 terraform init -backend=false
 terraform validate
 ```
@@ -963,7 +963,7 @@ Expected: `Success! The configuration is valid.`
 - [ ] **Step 12: Verify no secret survived the migration**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 grep -rn 'db_password' . --include='*.tf' --include='*.tfvars*' || echo "no db_password references ✓"
 gitleaks detect --no-git --source . --config .gitleaks.toml --redact ; echo "exit=$?"
 ```
@@ -973,7 +973,7 @@ Expected: `no db_password references ✓` and `exit=0`.
 - [ ] **Step 13: Run TFLint**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 tflint --recursive --config="$(pwd)/.tflint.hcl"
 ```
 
@@ -989,7 +989,7 @@ add-ons, IRSA, access entries and Karpenter — but each must be triaged then.
 Two copies of infrastructure code is how the wrong one gets applied. Once the migration is
 verified, the source stops being a working directory.
 
-**Where:** `~/Documents/plateng-infra`
+**Where:** `~/Documents/beyric/projects/plateng-infra`
 
 ```bash
 mv weysure-infrastructure weysure-infrastructure.ARCHIVED-2026-08-26
@@ -1005,7 +1005,7 @@ whole archive once Phase 1 has applied successfully from the new location.
 - [ ] **Step 15: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add modules projects/weysure/terraform
 git commit -m "feat(terraform): migrate weysure infrastructure under version control
 
@@ -1031,7 +1031,7 @@ nothing was applied."
 `Beyric/plateng-gitops` is empty. Phase 2 installs Argo CD pointing at it, so the directory
 structure must exist first.
 
-**Files (in `~/Documents/plateng-infra/plateng-gitops`):**
+**Files (in `~/Documents/beyric/projects/plateng-infra/plateng-gitops`):**
 - Create: `README.md`, `.gitignore`, `.gitleaks.toml`
 - Create: `bootstrap/.gitkeep`, `platform/.gitkeep`
 - Create: `projects/weysure/apps/.gitkeep`
@@ -1043,7 +1043,7 @@ structure must exist first.
 - [ ] **Step 1: Confirm the repository is empty**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-gitops && git log --oneline 2>&1 | head -2
+cd ~/Documents/beyric/projects/plateng-infra/plateng-gitops && git log --oneline 2>&1 | head -2
 ```
 
 Expected: `fatal: your current branch 'main' does not have any commits yet` or similar.
@@ -1051,7 +1051,7 @@ Expected: `fatal: your current branch 'main' does not have any commits yet` or s
 - [ ] **Step 2: Create the directory skeleton**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-gitops
+cd ~/Documents/beyric/projects/plateng-infra/plateng-gitops
 mkdir -p bootstrap platform projects/weysure/apps projects/weysure/environments/stage projects/weysure/environments/prod
 for d in bootstrap platform projects/weysure/apps projects/weysure/environments/stage projects/weysure/environments/prod; do touch "$d/.gitkeep"; done
 find . -type d -not -path './.git*' | sort
@@ -1136,7 +1136,7 @@ path = '''\.ya?ml$'''
 - [ ] **Step 5: Verify the guard rule works**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-gitops
+cd ~/Documents/beyric/projects/plateng-infra/plateng-gitops
 cat > /tmp/bad-secret.yaml <<'YAML'
 apiVersion: v1
 kind: Secret
@@ -1163,7 +1163,7 @@ Expected: `exit=0`.
 - [ ] **Step 7: Commit and push on a branch**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-gitops
+cd ~/Documents/beyric/projects/plateng-infra/plateng-gitops
 git checkout -b feature/repository-scaffold
 git add -A
 git commit -m "chore: scaffold gitops repository structure
@@ -1214,7 +1214,7 @@ Expected: `false` for each repository that has a `main` branch.
 - [ ] **Step 2: Add CODEOWNERS to both platform repositories**
 
 ```bash
-for R in ~/Documents/plateng-infra/plateng-infrastructure-tools ~/Documents/plateng-infra/plateng-gitops; do
+for R in ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools ~/Documents/beyric/projects/plateng-infra/plateng-gitops; do
 cat > "$R/CODEOWNERS" <<'OWNERS'
 # Default owner for everything in this repository.
 *                       @innocent98
@@ -1298,7 +1298,7 @@ Expected for each: `protected reviews=1 force_push=false`.
 - [ ] **Step 6: Prove a direct push to `main` is now rejected**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git checkout main && git pull --quiet
 echo "canary $(date +%s)" >> /tmp/protection-canary.txt
 cp /tmp/protection-canary.txt ./protection-canary.txt
@@ -1311,7 +1311,7 @@ Expected: rejected with `protected branch hook declined` or `Changes must be mad
 - [ ] **Step 7: Clean up the canary**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git reset --hard origin/main
 rm -f ./protection-canary.txt /tmp/protection-canary.txt
 git checkout feature/phase-0-foundations
@@ -1363,7 +1363,7 @@ Conventional Commits: `type(scope): subject`. Types: `feat` `fix` `chore` `docs`
 - [ ] **Step 9: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add CODEOWNERS docs/conventions/REPOSITORY_STANDARDS.md
 git commit -m "chore(governance): add CODEOWNERS and document repository standards
 
@@ -1424,7 +1424,7 @@ echo "operating on key: ${KEY_ID:0:8}…"
 Deleting the access key breaks **anything** still using it.
 
 ```bash
-grep -rln 'profile.*=.*"personal"' ~/Documents/plateng-infra ~/Documents/dev 2>/dev/null | grep -v node_modules
+grep -rln 'profile.*=.*"personal"' ~/Documents/beyric/projects/plateng-infra ~/Documents/dev 2>/dev/null | grep -v node_modules
 ```
 
 Verified consumers today:
@@ -1525,7 +1525,7 @@ the `provider "aws"` block.
 Verify:
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 grep -n 'profile' versions.tf
 terraform init -backend=false && terraform validate
 ```
@@ -1571,7 +1571,7 @@ Note in the commit message which choice you made.
 - [ ] **Step 14: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add projects/weysure/terraform/versions.tf
 git commit -m "chore(iam): switch terraform to the IAM Identity Center SSO profile
 
@@ -1721,7 +1721,7 @@ old DynamoDB lock table. `versions.tf` already declares it. Confirm the toolchai
 
 ```bash
 terraform version | head -1
-grep -n 'use_lockfile' ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform/versions.tf
+grep -n 'use_lockfile' ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform/versions.tf
 ```
 
 Expected: `Terraform v1.15.8` (>= 1.10) and `use_lockfile = true`.
@@ -1775,7 +1775,7 @@ nothing, but it exercises the whole path: SSO credentials → S3 backend → sta
 provider → module resolution. If this works, Phase 1 will not fail on plumbing.
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform plan -out=/tmp/phase0-dryrun.tfplan
@@ -1798,7 +1798,7 @@ clear it with `terraform force-unlock <LOCK_ID>` before continuing.
 
 ```bash
 rm -f /tmp/phase0-dryrun.tfplan
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git status --short
 ```
 
@@ -1864,7 +1864,7 @@ time to act. An actual-spend alert at 100% is a post-mortem.
 Phase 0–1 only, and only when nothing stateful exists yet:
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/projects/weysure/terraform
 terraform destroy
 ```
 
@@ -1875,7 +1875,7 @@ and follow `DATABASE_RECOVERY.md`.
 - [ ] **Step 13: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add projects/weysure/docs/runbooks/COST_CONTROLS.md
 git commit -m "chore(cost): add monthly budget with forecast alerting and document controls
 
@@ -1908,7 +1908,7 @@ session should understand Phase 0 from it alone, without reading the diff.
 - [ ] **Step 1: Re-run every exit check in one pass**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 echo "── terraform ──";  terraform fmt -check -recursive . && echo "fmt clean"
 ( cd projects/weysure/terraform && terraform validate )
 echo "── secrets ──";    gitleaks detect --no-git --source . --config .gitleaks.toml --redact; echo "gitleaks exit=$?"
@@ -2019,7 +2019,7 @@ Add to the deferred follow-ups table:
 - [ ] **Step 4: Verify the checklist is honest**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 python3 - <<'PY2'
 import re, pathlib
 p0 = pathlib.Path("projects/weysure/docs/checklist/BUILD_CHECKLIST.md").read_text().split("## Phase 0")[1].split("## Phase 1")[0]
@@ -2035,7 +2035,7 @@ do not tick it to make this pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git add projects/weysure/docs/sop projects/weysure/docs/checklist
 git commit -m "docs(platform): record phase 0 SOP and reconcile the build checklist
 
@@ -2049,7 +2049,7 @@ The body is passed through a quoted heredoc (`<<'BODY'`), so nothing inside it n
 backticks and dollar signs are taken literally.
 
 ```bash
-cd ~/Documents/plateng-infra/plateng-infrastructure-tools
+cd ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools
 git push -u origin feature/phase-0-foundations
 
 gh pr create --base main --head feature/phase-0-foundations \

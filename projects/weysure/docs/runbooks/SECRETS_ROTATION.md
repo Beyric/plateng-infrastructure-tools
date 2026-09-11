@@ -29,7 +29,7 @@ a visible outage, so it belongs in a maintenance window.
 ## After each rotation
 
 ```bash
-cd ~/Documents/dev/weysure/Weysure-API
+cd ~/Documents/beyric/projects/weysure/Weysure-API
 docker compose up -d && sleep 15 && curl -fsS http://localhost:8000/api/v1/health
 ```
 
@@ -53,7 +53,7 @@ This runbook shrinks substantially:
 After a full rotation, confirm nothing was missed:
 
 ```bash
-gitleaks detect --source ~/Documents/dev/weysure/Weysure-API --redact --no-banner
+gitleaks detect --source ~/Documents/beyric/projects/weysure/Weysure-API --redact --no-banner
 ```
 
 History findings are expected — see `SECRET_EXPOSURE_HISTORY.md`. What matters is that no

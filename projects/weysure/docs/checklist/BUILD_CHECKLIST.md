@@ -43,7 +43,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] Gitleaks pre-commit hook installed locally
   - [x] Gitleaks scan across all four repos, including full history
 - [ ] **Terraform migration** *(Finding ②)*
-  - [x] Move `~/Documents/plateng-infra/weysure-infrastructure` into `projects/weysure/`
+  - [x] Move `~/Documents/beyric/projects/plateng-infra/weysure-infrastructure` into `projects/weysure/`
   - [x] Extract shared modules to `modules/`
   - [x] `terraform fmt` + `terraform validate` clean
   - [ ] `tflint` and `checkov` (or `tfsec`) baseline recorded
