@@ -580,3 +580,38 @@ push deploys nothing, so the blast radius today is a git revert.
 
 **Revisit if:** a second environment (`stage`) arrives — promote to `stage` directly, and
 gate `prod` behind a PR or an Argo CD sync window, per ADR-005's "promotion is a commit".
+
+## ADR-021 — Vault Agent injector for leased credentials, ESO for everything else
+
+**Date:** 2026-09-11 · **Status:** Accepted · **Proposed by:** Claude, approved by Adebayo (design 1/1/1)
+
+**Context.** ADR-008 chose External Secrets Operator over the Vault Agent injector for portability.
+Phase 5's database engine mints *leased* Postgres users (1 h TTL, 24 h max). ESO copies values; it
+cannot renew a lease, so it would re-mint on every refresh and Reloader would bounce pods ~hourly
+with two live users per cycle. A static DB user in KV would reverse the point of Phase 5.
+
+**Decision.** Enable the injector, scoped by namespace label (`vault-injection=enabled`) and
+`failurePolicy: Ignore`. API pods get a sidecar that leases `database/creds/weysure-app`, renders
+`DATABASE_URL` to `/vault/secrets/env`, renews to max TTL, then re-renders and signals gunicorn so
+the container restarts on the new credential. Migration Jobs use an init-only agent
+(`agent-pre-populate-only`). Static application secrets stay on ESO (`secret/weysure/prod`).
+
+**Consequences.** No standing database password exists. Each API pod restarts once a day (rolling,
+under the PDB). Two secret mechanisms in the cluster, each for what it is good at. Vault config is
+still imperative — moving it to the Terraform `vault` provider is the follow-up.
+
+## ADR-022 — One-shot database work is a plain Job, never an Argo hook
+
+**Date:** 2026-09-11 · **Status:** Accepted
+
+**Context.** `db-bootstrap` (Phase 5) was a Sync hook with `HookSucceeded` deletion. Every sync of
+`weysure-prod` re-created and re-ran it: it rotated the `vault` role's password and rewrote both
+database roles to the Phase 5 SQL, silently undoing Phase 7 changes. Adding a new hook-only Job
+also never triggered a sync, because hooks are not compared.
+
+**Decision.** Work that must run exactly once is a plain, immutable `Job` with no hook annotations
+and no `ttlSecondsAfterFinished`. Argo applies it once; it stays `Complete` as the record. Hooks
+are reserved for per-sync work (the migration Job). The Phase 5 Job is retired from the live path.
+
+**Consequences.** A new one-shot needs a new Job name (`db-grants-v2`). Completed Jobs accumulate
+as history — acceptable, and easier to audit than deleted hooks.
