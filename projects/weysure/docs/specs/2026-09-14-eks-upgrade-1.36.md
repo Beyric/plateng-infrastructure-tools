@@ -58,6 +58,8 @@ AMI id in `platform/karpenter/ec2nodeclass.yaml` and let drift roll back.
 
 ## Definition of done
 
-`aws eks describe-cluster` → version 1.36, supportType STANDARD; all nodes
+`aws eks describe-cluster` → version 1.36; `describe-cluster-versions --cluster-versions 1.36` →
+STANDARD_SUPPORT (the cluster's `upgradePolicy.supportType` is a policy setting, not the billing
+state — corrected after hop 3); all nodes
 1.36 kubelet; all Argo apps Synced/Healthy; both hosts 200; cost run-rate
 drops by ~$12/day within 48 h (Cost Explorer daily).

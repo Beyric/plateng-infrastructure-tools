@@ -11,11 +11,11 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 6 / 11 phases — 0, 1, 2, 3, 4, 6 · Phase 5 core done, restore drill deferred to 10 |
-| 🔵 In progress | 1 — Phase 0 (design approved, not started) |
+| ✅ Complete | 7 / 11 phases — 0, 1, 2, 3, 4, 6, 7 · Phase 5 core done, restore drill deferred to 10 |
+| 🔵 In progress | 1 — Phase 8 (EKS upgrade and Traefik HA done; AWS LBC next) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$230/mo** — cluster (2 system nodes) + RDS + NLB + spot agents |
+| 💰 Current AWS spend | **~$390/mo run-rate after the EKS upgrade** (was ~$750/mo on extended support); 2 on-demand system nodes are the next lever |
 | 📐 Projected steady-state | **$240–270/mo** |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -177,21 +177,32 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] SOP · Findings ㉕–㉚ · ADR-020
 - [ ] runbook `GITHUB_ACTIONS_FAILURE.md` → renamed `JENKINS_FAILURE.md`, Phase 10 · workflow `CI_CD_WORKFLOW.md` · diagram
 
-## Phase 7 — Application delivery ⚪
+## Phase 7 — Application delivery ✅ *(2026-09-13 · [SOP](../sop/2026-09-14-phase-7-app-delivery.md))*
 
-- [ ] Helm chart for `weysure-api`
+- [x] Library chart `beyric-app` for every Beyric service; `weysure-api` and `weysure-web` are values files *(ADR spec D1; gitops #14)*
 - [x] Frontend Dockerfile + `output: "standalone"` *(Finding ⑩, web #1; runtime hardened web #6)*
-- [ ] Helm chart for `weysure-web`
-- [ ] Liveness / readiness / startup probes
-- [ ] Resource requests and limits from measured usage
-- [ ] HPA and PodDisruptionBudget
-- [ ] **Migrations as an Argo CD PreSync hook; removed from container start** *(Finding ⑨)*
-- [ ] `api_scheduler` deployed as a single-replica Deployment
-- [ ] Stage deploy verified, then prod
-- [ ] SOP · runbooks `PROD_RELEASE.md`, `DEPLOYMENT_ROLLBACK.md` · diagram
+- [x] Liveness / readiness / startup probes on `/api/v1/health` and `/`
+- [x] Resource requests and limits (initial; tighten from metrics in Phase 9)
+- [x] HPA 2→4 and PodDisruptionBudget `minAvailable 1` for api and web
+- [x] **Migrations as an Argo CD PreSync hook; removed from container start** *(Finding ⑨, Weysure-API #11)*
+- [x] `api-scheduler` deployed as a single-replica Deployment
+- [x] Vault Agent sidecar: per-pod dynamic `DATABASE_URL`, no standing DB password *(ADR-021)*
+- [x] PostgreSQL 16 role layout: `weysure_owner` / `weysure_app` groups *(Finding ㉜, gitops #20–#22)*
+- [x] Prod verified: both hosts 200 with TLS; 48 migrations applied from empty; pod deletion test
+- [ ] Zero-downtime rollout measured across a real promote (probe over the whole rollout)
+- [ ] 24 h Vault credential rotation observed end to end
+- [ ] Paystack webhook URL set in the Paystack dashboard
+- [x] SOP · runbooks `PROD_RELEASE.md`, `DEPLOYMENT_ROLLBACK.md`, `VAULT_CONFIG.md` · diagram · developer hand-over
+- ⏸ Staging environment (prod only, Adebayo 2026-09-09)
 
-## Phase 8 — Policy ⚪
+## Phase 8 — Policy, cost and edge 🔵
 
+- [x] **EKS 1.31 → 1.36** in five hops; control plane out of extended support (−$365/mo) *(2026-09-14 · [SOP](../sop/2026-09-14-eks-upgrade-1.36.md))*
+- [x] Traefik HA: 2 replicas on system nodes + PDB *(Finding ㊳, gitops #27)*
+- [ ] **AWS Load Balancer Controller** replacing the in-tree NLB integration *(Finding ㊴)* — pod-IP targets, readiness gates
+- [ ] Decide `upgradePolicy.supportType` (STANDARD = auto-upgrade at end of standard support, vs EXTENDED billing)
+- [ ] System nodes: Graviton / one node + Karpenter fallback / Savings Plan (target $140 → ~$80/mo)
+- [ ] Redis: PDB or `do-not-disrupt` (evicted by Karpenter drift during upgrades)
 - [ ] Kyverno installed; **audit mode before enforce**
 - [ ] Baseline policies: no `:latest`, require limits, non-root, read-only rootfs, drop caps
 - [ ] Default-deny NetworkPolicies per namespace
