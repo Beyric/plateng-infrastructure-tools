@@ -48,11 +48,6 @@ variable "kubernetes_version" {
   default = "1.31"
 }
 
-variable "system_node_instance_type" {
-  description = "Fixed-performance, not burstable. t3 throttles to 20-30% of a vCPU once credits run out, which presents as unexplained slowness rather than an error (ADR-003)."
-  type        = string
-  default     = "m6i.large"
-}
 
 variable "system_node_min" {
   description = "Two, since Phase 6. This is the value that actually sizes the group after creation: the EKS module ignores desired_size changes (lifecycle ignore_changes) so autoscalers can move it, which means only min_size and max_size are enforced by Terraform. Finding 25."
