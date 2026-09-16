@@ -77,3 +77,9 @@ variable "db_instance_class" {
   type        = string
   default     = "db.t4g.micro"
 }
+
+variable "system_arm_instance_type" {
+  description = "Graviton instance type for the arm64 system node group (Phase 8, spec D2)."
+  type        = string
+  default     = "m7g.large"
+}

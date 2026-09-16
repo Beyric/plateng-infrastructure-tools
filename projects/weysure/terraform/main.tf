@@ -86,7 +86,12 @@ module "eks" {
     coredns                = {}
     eks-pod-identity-agent = { before_compute = true }
     kube-proxy             = {}
-    vpc-cni                = { before_compute = true }
+    vpc-cni = {
+      before_compute = true
+      # Phase 8 (spec D6): NetworkPolicy enforcement by the VPC CNI's eBPF agent,
+      # no second CNI. Policies themselves live in plateng-gitops.
+      configuration_values = jsonencode({ enableNetworkPolicy = "true" })
+    }
     aws-ebs-csi-driver = {
       # The controller calls EC2 to create and attach volumes, so it needs an
       # AWS identity. enable_irsa below creates the OIDC provider - the trust
@@ -115,6 +120,17 @@ module "eks" {
       desired_size = var.system_node_desired
 
       labels = { "node-role" = "system" }
+    }
+    # Phase 8 (spec D2): Graviton twin of `system`, blue/green. Both groups carry
+    # node-role=system; drain the x86 nodes, then remove the `system` group.
+    system_arm = {
+      instance_types = [var.system_arm_instance_type]
+      ami_type       = "AL2023_ARM_64_STANDARD"
+      capacity_type  = "ON_DEMAND"
+      min_size       = var.system_node_min
+      max_size       = var.system_node_max
+      desired_size   = var.system_node_desired
+      labels         = { "node-role" = "system" }
     }
   }
 
