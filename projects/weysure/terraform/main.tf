@@ -109,20 +109,9 @@ module "eks" {
   enable_irsa = true
 
   eks_managed_node_groups = {
-    # ADR-003/012: this group exists only to break Karpenter's chicken-and-egg —
-    # Karpenter is a Kubernetes controller and cannot provision the node it runs on.
-    system = {
-      instance_types = [var.system_node_instance_type]
-      capacity_type  = "ON_DEMAND"
-
-      min_size     = var.system_node_min
-      max_size     = var.system_node_max
-      desired_size = var.system_node_desired
-
-      labels = { "node-role" = "system" }
-    }
-    # Phase 8 (spec D2): Graviton twin of `system`, blue/green. Both groups carry
-    # node-role=system; drain the x86 nodes, then remove the `system` group.
+    # System node group: Graviton (Phase 8, spec D2). The x86 `system` group was
+    # drained and removed on 2026-09-16 after both arm64 nodes carried the
+    # platform for the cut-over; every platform image is multi-arch.
     system_arm = {
       instance_types = [var.system_arm_instance_type]
       ami_type       = "AL2023_ARM_64_STANDARD"
