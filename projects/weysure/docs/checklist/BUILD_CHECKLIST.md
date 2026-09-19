@@ -12,11 +12,11 @@
 | Status | Count |
 |---|---|
 | ✅ Complete | 7 / 11 phases — 0, 1, 2, 3, 4, 6, 7 · Phase 5 core done, restore drill deferred to 10 |
-| 🔵 In progress | 1 — Phase 8 (EKS upgrade and Traefik HA done; AWS LBC next) |
+| 🔵 In progress | 1 — Phase 8 (everything shipped; Kyverno Enforce on 2026-09-23 closes it) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$390/mo run-rate after the EKS upgrade** (was ~$750/mo on extended support); 2 on-demand system nodes are the next lever |
-| 📐 Projected steady-state | **$240–270/mo** |
+| 💰 Current AWS spend | **~$385/mo run-rate** ($12.5–13.8/day, 2026-09-18) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
+| 📐 Projected steady-state | **$300–320/mo** floor for this architecture (2 on-demand system nodes, NAT, RDS); ~$270 with a Savings Plan |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
 **Legend:** ⚪ planned · 🔵 in progress · ✅ complete · ⚠ blocked · ⏸ deferred
@@ -195,20 +195,23 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] SOP · runbooks `PROD_RELEASE.md`, `DEPLOYMENT_ROLLBACK.md`, `VAULT_CONFIG.md` · diagram · developer hand-over
 - ⏸ Staging environment (prod only, Adebayo 2026-09-09)
 
-## Phase 8 — Policy, cost and edge 🔵
+## Phase 8 — Policy, cost and edge 🔵 *(2026-09-19 · [SOP](../sop/2026-09-19-phase-8-policy-cost-edge.md) — Enforce pending)*
 
 - [x] **EKS 1.31 → 1.36** in five hops; control plane out of extended support (−$365/mo) *(2026-09-14 · [SOP](../sop/2026-09-14-eks-upgrade-1.36.md))*
 - [x] Traefik HA: 2 replicas on system nodes + PDB *(Finding ㊳, gitops #27)*
-- [ ] **AWS Load Balancer Controller** replacing the in-tree NLB integration *(Finding ㊴)* — pod-IP targets, readiness gates
-- [ ] Decide `upgradePolicy.supportType` (STANDARD = auto-upgrade at end of standard support, vs EXTENDED billing)
-- [ ] System nodes: Graviton / one node + Karpenter fallback / Savings Plan (target $140 → ~$80/mo)
-- [ ] Redis: PDB or `do-not-disrupt` (evicted by Karpenter drift during upgrades)
-- [ ] Kyverno installed; **audit mode before enforce**
-- [ ] Baseline policies: no `:latest`, require limits, non-root, read-only rootfs, drop caps
-- [ ] Default-deny NetworkPolicies per namespace
-- [ ] ResourceQuota + LimitRange per namespace
-- [ ] Policy exceptions documented with rationale
-- [ ] SOP · diagram · Well-Architected delta
+- [x] **AWS Load Balancer Controller** owns the NLB — pod-IP targets, readiness gates; drain measured at 0 non-200 *(Finding ㊴, infra #26, gitops #29–#30)*
+- [x] Legacy NLB, target groups and open NodePort SG rules deleted *(2026-09-19)*
+- [x] `upgradePolicy.supportType`: keep EXTENDED + alert 60 days before 2027-08-02 *(decision D3; alert → Phase 9)*
+- [x] System nodes → 2× m7g.large Graviton, x86 group removed (−$28/mo) *(infra #26, #27)*
+- [x] Redis `do-not-disrupt` + hardened to the namespace baseline *(gitops #28, #33)*
+- [x] Kyverno installed, 8 baseline policies in **Audit**; `weysure-prod` 183 pass / 0 fail *(gitops #28, #29, #33)*
+- [ ] **Kyverno Enforce in `weysure-prod`** — 2026-09-23 after the audit window
+- [x] Default-deny NetworkPolicies in `weysure-prod` with explicit allows *(gitops #31, #32)*
+- [x] ResourceQuota + LimitRange in `weysure-prod`
+- [x] Policy exceptions documented with rationale (`db-grants-v2`)
+- [x] SOP · runbook `LOAD_BALANCER_CUTOVER.md` · Well-Architected delta
+- [ ] Stale Vault database leases cleaned up *(Finding ㊶)*
+- ⏸ Savings Plan (after Phase 9) · `ami_release_version` pin (Phase 10) · platform charts' requests/limits
 
 ## Phase 9 — Observability ⚪
 
