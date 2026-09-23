@@ -115,11 +115,17 @@ module "eks" {
     system_arm = {
       instance_types = [var.system_arm_instance_type]
       ami_type       = "AL2023_ARM_64_STANDARD"
-      capacity_type  = "ON_DEMAND"
-      min_size       = var.system_node_min
-      max_size       = var.system_node_max
-      desired_size   = var.system_node_desired
-      labels         = { "node-role" = "system" }
+      # Pinned (Phase 8 lesson): by default the module follows the newest AMI, so
+      # ANY terraform apply could roll both system nodes. Node patching is now a
+      # deliberate one-line PR: bump this to the release shown by
+      #   aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.36/amazon-linux-2023/arm64/standard/recommended/release_version
+      use_latest_ami_release_version = false
+      ami_release_version            = "1.36.3-20260911"
+      capacity_type                  = "ON_DEMAND"
+      min_size                       = var.system_node_min
+      max_size                       = var.system_node_max
+      desired_size                   = var.system_node_desired
+      labels                         = { "node-role" = "system" }
     }
   }
 

@@ -65,3 +65,8 @@ output "rds_master_secret_arn" {
   description = "Secrets Manager ARN of the RDS-managed master password. Break-glass only."
   value       = module.rds.db_instance_master_user_secret_arn
 }
+
+output "loki_bucket" {
+  description = "S3 bucket for Loki chunks and index (Phase 9)."
+  value       = aws_s3_bucket.loki.bucket
+}
