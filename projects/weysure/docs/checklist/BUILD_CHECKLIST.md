@@ -11,11 +11,11 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 7 / 11 phases — 0, 1, 2, 3, 4, 6, 7 · Phase 5 core done, restore drill deferred to 10 |
-| 🔵 In progress | 1 — Phase 8 (everything shipped; Kyverno Enforce on 2026-09-23 closes it) |
+| ✅ Complete | 9 / 11 phases — 0, 1, 2, 3, 4, 6, 7, 8, 9 · Phase 5 core done, restore drill deferred to 10 |
+| 🔵 In progress | 0 — Phase 10 (hardening/DR) next |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$385/mo run-rate** ($12.5–13.8/day, 2026-09-18) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
+| 💰 Current AWS spend | **~$395/mo run-rate** ($13.0–13.3/day, 2026-09-22, monitoring included) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
 | 📐 Projected steady-state | **$300–320/mo** floor for this architecture (2 on-demand system nodes, NAT, RDS); ~$270 with a Savings Plan |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -195,7 +195,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] SOP · runbooks `PROD_RELEASE.md`, `DEPLOYMENT_ROLLBACK.md`, `VAULT_CONFIG.md` · diagram · developer hand-over
 - ⏸ Staging environment (prod only, Adebayo 2026-09-09)
 
-## Phase 8 — Policy, cost and edge 🔵 *(2026-09-19 · [SOP](../sop/2026-09-19-phase-8-policy-cost-edge.md) — Enforce pending)*
+## Phase 8 — Policy, cost and edge ✅ *(2026-09-19 · [SOP](../sop/2026-09-19-phase-8-policy-cost-edge.md); Enforce 2026-09-21)*
 
 - [x] **EKS 1.31 → 1.36** in five hops; control plane out of extended support (−$365/mo) *(2026-09-14 · [SOP](../sop/2026-09-14-eks-upgrade-1.36.md))*
 - [x] Traefik HA: 2 replicas on system nodes + PDB *(Finding ㊳, gitops #27)*
@@ -205,26 +205,30 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] System nodes → 2× m7g.large Graviton, x86 group removed (−$28/mo) *(infra #26, #27)*
 - [x] Redis `do-not-disrupt` + hardened to the namespace baseline *(gitops #28, #33)*
 - [x] Kyverno installed, 8 baseline policies in **Audit**; `weysure-prod` 183 pass / 0 fail *(gitops #28, #29, #33)*
-- [ ] **Kyverno Enforce in `weysure-prod`** — 2026-09-23 after the audit window
+- [x] **Kyverno Enforce in `weysure-prod`** — 2026-09-21; bad pod denied, good pod passes, other namespaces Audit *(gitops #38)*
 - [x] Default-deny NetworkPolicies in `weysure-prod` with explicit allows *(gitops #31, #32)*
 - [x] ResourceQuota + LimitRange in `weysure-prod`
 - [x] Policy exceptions documented with rationale (`db-grants-v2`)
 - [x] SOP · runbook `LOAD_BALANCER_CUTOVER.md` · Well-Architected delta
-- [ ] Stale Vault database leases cleaned up *(Finding ㊶)*
+- [x] Stale Vault database leases cleaned up — 5 roles dropped, 5 leases revoked *(Finding ㊶, gitops #34)*
 - ⏸ Savings Plan (after Phase 9) · `ami_release_version` pin (Phase 10) · platform charts' requests/limits
 
-## Phase 9 — Observability ⚪
+## Phase 9 — Observability ✅ *(2026-09-23 · [SOP](../sop/2026-09-23-phase-9-observability.md))*
 
-- [ ] kube-prometheus-stack with persistent storage
-- [ ] Grafana with IRSA + persistent dashboards
-- [ ] Alertmanager routing (email / Slack)
-- [ ] Blackbox exporter probing public endpoints
-- [ ] FastAPI `/metrics` instrumentation
-- [ ] RED dashboards (app) + USE dashboards (nodes)
-- [ ] Alert rules: pod crashloop, node pressure, certificate expiry, RDS storage, Vault sealed, Argo CD out-of-sync
-- [ ] **Alerts tested by inducing real failures**
-- [ ] Log aggregation decision + implementation
-- [ ] SOP · runbooks `INCIDENT_RESPONSE.md`, `ONCALL.md` · diagram
+- [x] kube-prometheus-stack on the system nodes; 7 d / 15 GB, expandable *(gitops #39)*
+- [x] Alertmanager → Slack (critical/warning), config rendered by ESO from Vault; test alert received
+- [x] Every platform component scraped (57 targets, 0 down) *(gitops #41)*
+- [x] Blackbox: external through Cloudflare (browser UA) + internal to the Services; TLS expiry *(gitops #42)*
+- [x] 18 platform alerts with runbook links; **drill: web down → critical Slack in 3 min, resolved** *(gitops #43, #44; infra #32)*
+- [x] Dead-man's switch: Watchdog → healthchecks.io *(gitops #45)*
+- [x] Loki on S3 (pod identity) + Alloy (stdout **and** stderr) — developer item 5 answered *(infra #31; gitops #46–#48)*
+- [x] Grafana behind Cloudflare Access with JWT validation at the origin; Admin/Viewer by email *(gitops #40)*
+- [x] Weysure service dashboard + 8 community boards *(gitops #49)*
+- [x] RDS CloudWatch alarms → SNS; sleep silences Alertmanager *(infra #31, #32)*
+- [x] System node AMI pinned — patching is a deliberate PR *(infra #31)*
+- [ ] Prefix delegation: system node at 28/29 pods *(Finding ㊷ → Phase 10 first)*
+- [ ] Drop Karpenter pricing-table series (22 % of Prometheus) *(Finding ㊸)*
+- ⏸ Tracing · app metrics/Sentry (developers) · Access forward-auth for Prometheus/Alertmanager/Jenkins/Sonar · SNS→Slack · healthchecks pause on sleep
 
 ## Phase 10 — Production readiness ⚪
 
