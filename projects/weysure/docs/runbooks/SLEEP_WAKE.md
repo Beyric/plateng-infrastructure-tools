@@ -30,6 +30,15 @@ are still running.
 RDS start → node group to 2 → Vault auto-unseals (KMS) → Karpenter up → NodePool limit and Redis
 restored → Argo reconciles. Verify: `kubectl get app -n argocd` all Healthy; both hosts 200.
 
+## Why the first run failed (Finding ㊹)
+Argo CD is the owner of the cluster. `karpenter-nodepools` has `selfHeal: true` and reverted the
+NodePool limit within seconds; a fresh gitops commit made every app re-apply git and put Redis back;
+Karpenter then launched three new nodes for the evicted pods. Any script that changes the cluster
+directly must first switch off automated sync on the Applications it fights (`weysure-prod`,
+`weysure-api`, `weysure-web`, `karpenter-nodepools`) and scale the app to 0 so PDBs cannot block the
+last eviction. Wake restores by re-syncing `root`, which re-applies the Applications with automated
+sync on. A commit to plateng-gitops between "pause" and "nodes to 0" (minutes) would still revert.
+
 ## Rules
 - Sites are **down** while asleep. Never sleep once there are users.
 - AWS auto-starts a stopped RDS instance after **7 days**.
