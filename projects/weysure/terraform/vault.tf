@@ -124,3 +124,63 @@ resource "aws_eks_pod_identity_association" "vault" {
   service_account = "vault"
   role_arn        = aws_iam_role.vault.arn
 }
+
+# ── Phase 10 (spec D1): daily Raft snapshot CronJob writes here ──────────────
+# The CronJob (plateng-gitops platform/vault/snapshot-cronjob.yaml) runs as
+# vault/vault-snapshot; this role lets it put objects and nothing else.
+data "aws_iam_policy_document" "vault_snapshot" {
+  statement {
+    sid       = "PutSnapshots"
+    actions   = ["s3:PutObject", "s3:AbortMultipartUpload", "s3:ListBucket"]
+    resources = [aws_s3_bucket.vault_snapshots.arn, "${aws_s3_bucket.vault_snapshots.arn}/*"]
+  }
+}
+
+resource "aws_iam_role" "vault_snapshot" {
+  name               = "${local.cluster_name}-vault-snapshot"
+  assume_role_policy = data.aws_iam_policy_document.vault_assume.json
+  tags               = local.tags
+}
+
+resource "aws_iam_role_policy" "vault_snapshot" {
+  name   = "vault-snapshot-s3"
+  role   = aws_iam_role.vault_snapshot.id
+  policy = data.aws_iam_policy_document.vault_snapshot.json
+}
+
+resource "aws_eks_pod_identity_association" "vault_snapshot" {
+  cluster_name    = module.eks.cluster_name
+  namespace       = "vault"
+  service_account = "vault-snapshot"
+  role_arn        = aws_iam_role.vault_snapshot.arn
+  tags            = local.tags
+}
+
+# Every snapshot is sealed with the KMS auto-unseal key: if that key is ever
+# scheduled for deletion, all backups become unreadable. Alarm on the API call.
+resource "aws_cloudwatch_event_rule" "kms_key_deletion" {
+  name        = "${local.cluster_name}-kms-schedule-key-deletion"
+  description = "ScheduleKeyDeletion or DisableKey on any KMS key (Vault unseal key protection)"
+  event_pattern = jsonencode({
+    source      = ["aws.kms"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail      = { eventSource = ["kms.amazonaws.com"], eventName = ["ScheduleKeyDeletion", "DisableKey"] }
+  })
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_event_target" "kms_key_deletion" {
+  rule = aws_cloudwatch_event_rule.kms_key_deletion.name
+  arn  = aws_sns_topic.platform_alerts.arn
+}
+
+resource "aws_sns_topic_policy" "platform_alerts_events" {
+  arn = aws_sns_topic.platform_alerts.arn
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Sid = "CloudWatchAlarms", Effect = "Allow", Principal = { Service = "cloudwatch.amazonaws.com" }, Action = "SNS:Publish", Resource = aws_sns_topic.platform_alerts.arn },
+      { Sid = "EventBridge", Effect = "Allow", Principal = { Service = "events.amazonaws.com" }, Action = "SNS:Publish", Resource = aws_sns_topic.platform_alerts.arn }
+    ]
+  })
+}

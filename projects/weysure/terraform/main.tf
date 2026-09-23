@@ -90,7 +90,13 @@ module "eks" {
       before_compute = true
       # Phase 8 (spec D6): NetworkPolicy enforcement by the VPC CNI's eBPF agent,
       # no second CNI. Policies themselves live in plateng-gitops.
-      configuration_values = jsonencode({ enableNetworkPolicy = "true" })
+      # Phase 10 (spec D3, Finding 42): prefix delegation assigns /28 prefixes per
+      # ENI instead of single IPs, lifting the per-node pod limit from 29 to 110 on
+      # m7g.large. Nodes must be re-created to pick up the new max-pods (below).
+      configuration_values = jsonencode({
+        enableNetworkPolicy = "true"
+        env                 = { ENABLE_PREFIX_DELEGATION = "true", WARM_PREFIX_TARGET = "1" }
+      })
     }
     aws-ebs-csi-driver = {
       # The controller calls EC2 to create and attach volumes, so it needs an
@@ -121,11 +127,26 @@ module "eks" {
       #   aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.36/amazon-linux-2023/arm64/standard/recommended/release_version
       use_latest_ami_release_version = false
       ami_release_version            = "1.36.3-20260911"
-      capacity_type                  = "ON_DEMAND"
-      min_size                       = var.system_node_min
-      max_size                       = var.system_node_max
-      desired_size                   = var.system_node_desired
-      labels                         = { "node-role" = "system" }
+      # With prefix delegation the kubelet must be told the new ceiling; AL2023
+      # reads it from nodeadm's NodeConfig. Changing user data rolls the group
+      # once (under the AWS Load Balancer Controller: zero-blip, Phase 8).
+      cloudinit_pre_nodeadm = [{
+        content_type = "application/node.eks.aws"
+        content      = <<-NODEADM
+          ---
+          apiVersion: node.eks.aws/v1alpha1
+          kind: NodeConfig
+          spec:
+            kubelet:
+              config:
+                maxPods: 110
+        NODEADM
+      }]
+      capacity_type = "ON_DEMAND"
+      min_size      = var.system_node_min
+      max_size      = var.system_node_max
+      desired_size  = var.system_node_desired
+      labels        = { "node-role" = "system" }
     }
   }
 
