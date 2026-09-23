@@ -10,6 +10,9 @@ ctx=$(kubectl config current-context); [[ "$ctx" == *"$CLUSTER"* ]] || { echo "k
 NG=$(aws eks list-nodegroups --cluster-name $CLUSTER --query 'nodegroups[0]' --output text)
 read -r -p "Sleep $CLUSTER (sites go DOWN until platform-wake.sh)? type 'sleep': " a; [[ "$a" == "sleep" ]] || exit 1
 
+echo "[0/5] silence Alertmanager for 12h so the shutdown does not fill Slack (persisted on its PVC; expires on its own)"
+AM=$(kubectl get pods -n monitoring -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+[[ -n "$AM" ]] && kubectl exec -n monitoring "$AM" -c alertmanager -- amtool --alertmanager.url=http://127.0.0.1:9093 silence add -a platform-sleep -d 12h -c "platform asleep (scripts/platform-sleep.sh)" 'alertname=~".+"' || echo "  (no Alertmanager found - continuing)"
 echo "[1/5] stop Karpenter from provisioning (NodePool cpu limit 0)"
 kubectl patch nodepool default --type merge -p '{"spec":{"limits":{"cpu":"0"}}}'
 echo "[2/5] release the do-not-disrupt cache so its node can drain"
