@@ -16,7 +16,9 @@ until [[ $(kubectl get nodes -l node-role=system --no-headers 2>/dev/null | grep
 echo "[4/5] wait for Vault to auto-unseal and Karpenter to run"
 kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=10m
 kubectl rollout status deploy/karpenter -n kube-system --timeout=10m
-echo "[5/5] restore what sleep changed (values from git: plateng-gitops)"
+echo "[5/5] restore what sleep changed (values from git: plateng-gitops); expire the sleep silence"
+AM=$(kubectl get pods -n monitoring -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+[[ -n "$AM" ]] && for id in $(kubectl exec -n monitoring "$AM" -c alertmanager -- amtool --alertmanager.url=http://127.0.0.1:9093 silence query -q -a platform-sleep 2>/dev/null); do kubectl exec -n monitoring "$AM" -c alertmanager -- amtool --alertmanager.url=http://127.0.0.1:9093 silence expire "$id"; done || true
 kubectl patch nodepool default --type merge -p '{"spec":{"limits":{"cpu":"32"}}}'   # value in plateng-gitops platform/karpenter/nodepool.yaml
 kubectl annotate app karpenter-nodepools weysure-prod -n argocd argocd.argoproj.io/refresh=hard --overwrite >/dev/null
 kubectl scale statefulset redis -n weysure-prod --replicas=1
