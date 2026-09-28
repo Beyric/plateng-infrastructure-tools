@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-09-09 (Phase 6 complete)
+> **Last reconciled:** 2026-09-28 (Phase 10 in progress: tasks 1-4, 6 done)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -12,7 +12,7 @@
 | Status | Count |
 |---|---|
 | ✅ Complete | 9 / 11 phases — 0, 1, 2, 3, 4, 6, 7, 8, 9 · Phase 5 core done, restore drill deferred to 10 |
-| 🔵 In progress | 0 — Phase 10 (hardening/DR) next |
+| 🔵 In progress | 1 — Phase 10 (hardening/DR) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
 | 💰 Current AWS spend | **~$395/mo run-rate** ($13.0–13.3/day, 2026-09-22, monitoring included) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
@@ -112,7 +112,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] **Database secrets engine** issuing 1-hour Postgres users
 - [ ] External Secrets Operator + `SecretStore` + `ExternalSecret`s
 - [ ] Reloader; **verified by rotating a secret and observing the restart**
-- [ ] Raft snapshot CronJob → S3 via IRSA
+- [x] Raft snapshot CronJob → S3 via Pod Identity; first snapshot in S3, `VaultSnapshotMissing` alert *(gitops #51, 2026-09-28)*
 - [ ] **Snapshot restore drill**
 - [ ] Argo CD bootstrap git credential rotated
 - [ ] Config/secret split: non-secret `.env` keys → ConfigMap in git
@@ -226,11 +226,25 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] Weysure service dashboard + 8 community boards *(gitops #49)*
 - [x] RDS CloudWatch alarms → SNS; sleep silences Alertmanager *(infra #31, #32)*
 - [x] System node AMI pinned — patching is a deliberate PR *(infra #31)*
-- [ ] Prefix delegation: system node at 28/29 pods *(Finding ㊷ → Phase 10 first)*
-- [ ] Drop Karpenter pricing-table series (22 % of Prometheus) *(Finding ㊸)*
+- [x] Prefix delegation: system nodes at 110 pods *(infra #36, 2026-09-24; Finding ㊺)*
+- [x] Drop Karpenter pricing-table series: 225k → <200k series *(gitops #50, 2026-09-28)*
 - ⏸ Tracing · app metrics/Sentry (developers) · Access forward-auth for Prometheus/Alertmanager/Jenkins/Sonar · SNS→Slack · healthchecks pause on sleep
 
-## Phase 10 — Production readiness ⚪
+## Phase 10 — Production readiness 🔵 *([spec](../specs/2026-09-23-phase-10-hardening-dr.md) · [plan](../plans/2026-09-23-phase-10-hardening-dr.md))*
+
+- [x] 1 · Prefix delegation + max-pods 110 on system nodes *(infra #36)*
+- [x] 2 · Hygiene: Karpenter series drop, LBC diff ignored, Vault restart-on-config, Access-aware probes *(gitops #50)*
+- [x] 3 · Vault snapshot identity, KMS deletion alarm, CloudTrail *(infra #36)*
+- [x] 4 · Vault snapshot CronJob + `VaultSnapshotMissing`; first snapshot verified in S3 *(gitops #51, 2026-09-28)*
+- [ ] 5 · Restore drill scripts + `RESTORE_DRILL.md`; run once (Vault scratch + RDS PITR)
+- [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
+- [ ] 7 · forward-auth verifier + Traefik Middleware; Ingresses for prometheus/alertmanager/argocd
+- [ ] 8 · Vault config in Terraform (`vault` provider), plan = 0 changes
+- [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
+  - [x] scripts rewritten; every read and patch dry-run against the live cluster
+  - [ ] healthchecks API key stored in Vault
+  - [ ] **full rehearsal: sleep → 0 instances → wake → all green**
+- [ ] 10 · SOP · overview · checklist close-out
 
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
 - [ ] SLOs and error budgets defined
