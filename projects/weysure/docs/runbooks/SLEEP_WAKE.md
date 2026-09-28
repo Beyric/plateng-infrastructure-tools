@@ -76,6 +76,8 @@ chain down, and verify the pause before acting on it.**
 
 ## Rules
 - Sites are **down** while asleep. Never sleep once there are users.
+- Never sleep a platform that is not healthy: Vault down, a node group update in progress or failed, or apps Degraded.
+  Fix first. Sleeping hides the fault and makes the wake harder (Finding ㊺). The snapshot in step 1 fails if Vault is down.
 - AWS auto-starts a stopped RDS instance after **7 days**.
 - Do not `terraform apply` while asleep — it sets the node group minimum back to 2 (a wake by accident).
 - Argo shows `root`, `karpenter-nodepools` and the `weysure-*` apps OutOfSync while asleep; that is the sleep state.
