@@ -113,7 +113,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] External Secrets Operator + `SecretStore` + `ExternalSecret`s
 - [ ] Reloader; **verified by rotating a secret and observing the restart**
 - [x] Raft snapshot CronJob → S3 via Pod Identity; first snapshot in S3, `VaultSnapshotMissing` alert *(gitops #51, 2026-09-28)*
-- [ ] **Snapshot restore drill**
+- [ ] **Snapshot restore drill** *(→ Phase 10 task 5)*
 - [ ] Argo CD bootstrap git credential rotated
 - [ ] Config/secret split: non-secret `.env` keys → ConfigMap in git
 - [ ] SOP · runbooks `VAULT_FAILURE.md`, `SECRETS_ROTATION.md` · diagram
@@ -150,7 +150,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Verify every table, index and constraint the models expect actually exists
 - [ ] `DATABASE_URL` pointed at RDS, credentials issued by Vault *(ADR-007)*
 - [ ] Application smoke test against RDS
-- [ ] **Restore drill from PITR — timed, RTO recorded**
+- [ ] **Restore drill from PITR — timed, RTO recorded** *(→ Phase 10 task 5)*
 - [ ] Supabase project decommissioned once RDS is observed healthy
 - [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
 - [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
@@ -236,7 +236,11 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] 2 · Hygiene: Karpenter series drop, LBC diff ignored, Vault restart-on-config, Access-aware probes *(gitops #50)*
 - [x] 3 · Vault snapshot identity, KMS deletion alarm, CloudTrail *(infra #36)*
 - [x] 4 · Vault snapshot CronJob + `VaultSnapshotMissing`; first snapshot verified in S3 *(gitops #51, 2026-09-28)*
-- [ ] 5 · Restore drill scripts + `RESTORE_DRILL.md`; run once (Vault scratch + RDS PITR)
+- [ ] 5 · Restore drill: scripts + [RESTORE_DRILL.md](../runbooks/RESTORE_DRILL.md); run once
+  - [x] `drill-vault-restore.sh` — tested end to end on dummy data: pass + 3 failure cases
+  - [x] `drill-rds-restore.sh` — comparison tested on local Postgres 16 (5 cases); Job accepted by the API server and Kyverno (dry run)
+  - [ ] **Vault drill run on the production snapshot; RPO and duration recorded**
+  - [ ] **RDS drill run; RPO and RTO recorded**
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [ ] 7 · forward-auth verifier + Traefik Middleware; Ingresses for prometheus/alertmanager/argocd
 - [ ] 8 · Vault config in Terraform (`vault` provider), plan = 0 changes
@@ -279,6 +283,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Separate prod cluster | +$73/mo + nodes | Stage causes a prod incident | ADR-006 |
 | 3-replica Vault HA | Node capacity | Node capacity increase | ADR-007 |
 | EKS Pod Identity (over IRSA) | Helm chart support still favours IRSA | Ecosystem maturity | — |
+| Database cut-over rehearsal (restore → rename → Terraform import) | Needs downtime; the drill proves the data, not the switch | Before go-live | — |
 | PDBs: `unhealthyPodEvictionPolicy: AlwaysAllow` | Found by Finding ㊺; not blocking | Before the next node roll | — |
 | Blackbox 2 replicas + `absent(probe_success)` alert | Found by Finding ㊺; probes were blind for 30 min | Before go-live | — |
 | Replace mixed-mode node `ip-10-0-4-83` | Works today; spot node, will be replaced anyway | Next maintenance window | — |
