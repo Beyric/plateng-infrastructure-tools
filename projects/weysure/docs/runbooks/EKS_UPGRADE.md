@@ -39,3 +39,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://weysure-api.beyrictech.com/api/
 ## 5. If the node group update stalls
 `aws eks describe-update` shows `PodEvictionFailure` → a PDB is blocking:
 `kubectl get pdb -A` → fix the budget → `terraform apply` again.
+
+EKS waits 15 minutes per node for pods to leave, then fails the update. Two different causes:
+
+| Pods on the node are | Cause | Fix |
+|---|---|---|
+| `Running` | A PDB allows 0 disruptions (`ALLOWED` column = 0) | Raise replicas or relax the budget, apply again |
+| `ContainerCreating` / not Ready | The node itself is broken; a not-Ready pod cannot satisfy its PDB, so eviction never succeeds | [VPC_CNI_MODE_CHANGE.md](VPC_CNI_MODE_CHANGE.md) → Recovery (Finding ㊺) |
+
+During any node roll keep the watch from that runbook open in a second terminal. A critical alert
+in Slack during a change means stop and look, not wait for Terraform.

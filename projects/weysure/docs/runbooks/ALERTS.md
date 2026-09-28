@@ -63,6 +63,8 @@ Expected while asleep (`karpenter-nodepools`, `weysure-prod`). `aws-load-balance
 ## ExternalSecretNotReady
 `kubectl describe externalsecret <name> -n <ns>` → the error: Vault path missing, policy lacks the path, Vault sealed,
 or the ClusterSecretStore's auth role expired.
+After a Vault outage: `kubectl get clustersecretstore vault` still `unable to create client` five minutes after Vault is
+back → `kubectl rollout restart deploy/external-secrets -n external-secrets` (Finding ㊺). Secrets keep their last value meanwhile.
 
 ## KarpenterChurn
 More than 6 node disruptions in an hour. `kubectl get events -A --field-selector reason=DisruptionBlocked,reason=Evicted`

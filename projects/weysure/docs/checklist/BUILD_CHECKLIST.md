@@ -242,8 +242,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] 8 · Vault config in Terraform (`vault` provider), plan = 0 changes
 - [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
-  - [ ] healthchecks API key stored in Vault
+  - [x] healthchecks API key stored in Vault *(2026-09-28, 32 chars)*
   - [ ] **full rehearsal: sleep → 0 instances → wake → all green**
+- [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
 - [ ] 10 · SOP · overview · checklist close-out
 
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
@@ -278,6 +279,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Separate prod cluster | +$73/mo + nodes | Stage causes a prod incident | ADR-006 |
 | 3-replica Vault HA | Node capacity | Node capacity increase | ADR-007 |
 | EKS Pod Identity (over IRSA) | Helm chart support still favours IRSA | Ecosystem maturity | — |
+| PDBs: `unhealthyPodEvictionPolicy: AlwaysAllow` | Found by Finding ㊺; not blocking | Before the next node roll | — |
+| Blackbox 2 replicas + `absent(probe_success)` alert | Found by Finding ㊺; probes were blind for 30 min | Before go-live | — |
+| Replace mixed-mode node `ip-10-0-4-83` | Works today; spot node, will be replaced anyway | Next maintenance window | — |
+| Subnet CIDR reservations for /28 prefixes | ~165 free addresses per private /24, no fragmentation seen | Free addresses < 100 or `InsufficientCidrBlocks` | — |
 
 ## Resolved questions
 
