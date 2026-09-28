@@ -42,6 +42,15 @@ More than 100 leases. Normal is a few dozen (one per API pod + logins). `vault l
 and `…/database/creds/weysure-app`; a climbing count means a login loop (agent restarting) or revocation failing —
 Finding ㊶, [VAULT_CONFIG.md](VAULT_CONFIG.md).
 
+## VaultSnapshotMissing
+No successful run of CronJob `vault/vault-snapshot` (02:00 UTC) in 26 h. `kubectl get job -n vault`, then
+`kubectl logs -n vault job/<name> -c snapshot` (Vault side) and `-c upload` (S3 side). Seen so far:
+`invalid role name` = the Kubernetes-auth role is missing ([VAULT_CONFIG.md](VAULT_CONFIG.md)); `403` on login = wrong
+ServiceAccount or audience; `AccessDenied` on upload = Pod Identity association `vault/vault-snapshot`. Expected after a
+sleep longer than a day - the wake script starts a snapshot. Run one now:
+`kubectl create job -n vault --from=cronjob/vault-snapshot vault-snapshot-manual-$(date +%s)`. Delete failed Jobs
+afterwards or `KubeJobFailed` fires.
+
 ## ArgoAppDegraded
 `kubectl get app <name> -n argocd -o yaml | grep -A5 conditions`; Degraded = a workload it owns is unhealthy (see the
 pod), Missing = a resource was deleted out from under it (a sync recreates it).
