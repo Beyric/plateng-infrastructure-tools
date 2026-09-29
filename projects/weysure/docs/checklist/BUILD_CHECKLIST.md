@@ -12,7 +12,7 @@
 | Status | Count |
 |---|---|
 | ✅ Complete | 9 / 11 phases — 0, 1, 2, 3, 4, 6, 7, 8, 9 · Phase 5 core done, restore drill deferred to 10 |
-| 🔵 In progress | 1 — Phase 10 (hardening/DR) |
+| 🔵 In progress | 1 — Phase 10 (hardening/DR) · **platform asleep since 2026-09-29 14:15 UTC** |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
 | 💰 Current AWS spend | **~$407/mo run-rate** ($13.57/day, 22–28 Sept, Cost Explorer; $356 once control-plane logs are off) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
@@ -113,7 +113,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] External Secrets Operator + `SecretStore` + `ExternalSecret`s
 - [ ] Reloader; **verified by rotating a secret and observing the restart**
 - [x] Raft snapshot CronJob → S3 via Pod Identity; first snapshot in S3, `VaultSnapshotMissing` alert *(gitops #51, 2026-09-28)*
-- [ ] **Snapshot restore drill** *(→ Phase 10 task 5)*
+- [x] **Snapshot restore drill** *(Phase 10 task 5, 2026-09-29: PASS)*
 - [ ] Argo CD bootstrap git credential rotated
 - [ ] Config/secret split: non-secret `.env` keys → ConfigMap in git
 - [ ] SOP · runbooks `VAULT_FAILURE.md`, `SECRETS_ROTATION.md` · diagram
@@ -150,7 +150,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Verify every table, index and constraint the models expect actually exists
 - [ ] `DATABASE_URL` pointed at RDS, credentials issued by Vault *(ADR-007)*
 - [ ] Application smoke test against RDS
-- [ ] **Restore drill from PITR — timed, RTO recorded** *(→ Phase 10 task 5)*
+- [x] **Restore drill from PITR — timed, RTO recorded** *(Phase 10 task 5, 2026-09-29: RTO 13 min)*
 - [ ] Supabase project decommissioned once RDS is observed healthy
 - [ ] Backend cleanup: delete dead Supabase code paths, drop `supabase==2.15.2`
 - [ ] SOP · runbook `DATABASE_RECOVERY.md` · diagram · Well-Architected delta
@@ -236,24 +236,24 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] 2 · Hygiene: Karpenter series drop, LBC diff ignored, Vault restart-on-config, Access-aware probes *(gitops #50)*
 - [x] 3 · Vault snapshot identity, KMS deletion alarm, CloudTrail *(infra #36)*
 - [x] 4 · Vault snapshot CronJob + `VaultSnapshotMissing`; first snapshot verified in S3 *(gitops #51, 2026-09-28)*
-- [ ] 5 · Restore drill: scripts + [RESTORE_DRILL.md](../runbooks/RESTORE_DRILL.md); run once
+- [x] 5 · Restore drill: scripts + [RESTORE_DRILL.md](../runbooks/RESTORE_DRILL.md); run once
   - [x] `drill-vault-restore.sh` — tested end to end on dummy data: pass + 3 failure cases
   - [x] `drill-rds-restore.sh` — comparison tested on local Postgres 16 (5 cases); Job accepted by the API server and Kyverno (dry run)
-  - [ ] **Vault drill run on the production snapshot; RPO and duration recorded**
-  - [ ] **RDS drill run; RPO and RTO recorded**
+  - [x] **Vault drill run on the production snapshot: PASS, 41 s** *(2026-09-29)*
+  - [x] **RDS drill run: PASS, RPO 261 s, RTO 13 min** *(2026-09-29)*
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [ ] 7 · forward-auth verifier + Traefik Middleware; Ingresses for prometheus/alertmanager/argocd
 - ⏸ 8 · Vault config in Terraform (`vault` provider), plan = 0 changes *(deferred 2026-09-29)*
 - [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
   - [x] healthchecks API key stored in Vault *(2026-09-28, 32 chars)*
-  - [ ] **full rehearsal: sleep → 0 instances → wake → all green**
+  - [x] **sleep rehearsed: 0 instances in 21 min** *(2026-09-29)*
+  - [ ] **wake rehearsed: all green** — platform left asleep on purpose
 - [x] Finding ㊺, second occurrence (2026-09-29): cause proven, prefix reservations in both private subnets, `scripts/subnet-blocks.sh` *(infra, this PR)*
   - [x] reservations applied *(2026-09-29 12:10 UTC, 8 added)*
   - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
-- [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra, this PR)*
-  - [ ] applied
+- [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays).
 - [ ] 10 · SOP · overview · checklist close-out

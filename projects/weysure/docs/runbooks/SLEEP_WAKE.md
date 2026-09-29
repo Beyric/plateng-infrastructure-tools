@@ -27,7 +27,7 @@ printf 'API key: '; read -rs K; echo; printf '{"api_key":"%s"}' "$K" | kubectl e
 The script reads it through your Vault login inside `vault-0` (1 h). Log in again before sleeping, or
 pass it for one run with `HC_API_KEY=… platform-sleep.sh`.
 
-## Sleep (~20 min, most of it waiting for the nodes to drain)
+## Sleep (~20 min, most of it waiting for the nodes to drain — measured 21 min)
 ```bash
 ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/scripts/platform-sleep.sh
 ```
@@ -74,11 +74,23 @@ Applications it fights — but those Applications are themselves objects owned b
 `selfHeal: true` and puts `syncPolicy.automated` back on them. **Pause from the top of the ownership
 chain down, and verify the pause before acting on it.**
 
+## Rehearsal log
+| Date | Part | Result | Duration | Notes |
+|---|---|---|---|---|
+| 2026-09-23 | sleep v1 | failed | — | Argo reverted every change within seconds (Finding ㊹) |
+| 2026-09-23 | sleep v2 (infra #34) | not run | — | would have been reverted by `root` |
+| **2026-09-29** | **sleep v3 (infra #37)** | **PASS** | **21 min** (13:54 → 14:15 UTC) | Snapshot taken first. Pause held through the 45 s proof. Spot nodes gone in 1 min, RDS stopped after 8 min, system nodes gone after 17 min (EKS drain). healthchecks paused, HTTP 200. **0 instances.** |
+| | wake | **not run yet** | | the platform was left asleep on purpose |
+
+Observed while asleep: 0 nodes, 0 instances, RDS `stopped`, 10 volumes kept, all five paused
+Applications still paused with their policy saved in the annotation, both sites unreachable.
+
 ## Rules
 - Sites are **down** while asleep. Never sleep once there are users.
+- **Nothing watches the platform while it is asleep**: Prometheus and Alertmanager are off, healthchecks.io is paused. Argo CD is off too: a merge to plateng-gitops is applied only at wake — do not merge what you will not be there to watch.
 - Never sleep a platform that is not healthy: Vault down, a node group update in progress or failed, or apps Degraded.
   Fix first. Sleeping hides the fault and makes the wake harder (Finding ㊺). The snapshot in step 1 fails if Vault is down.
-- AWS auto-starts a stopped RDS instance after **7 days**.
+- AWS auto-starts a stopped RDS instance after **7 days** — and it then bills while nothing uses it. Asleep for longer than a week: wake and sleep again, or stop it again by hand (`aws rds stop-db-instance --db-instance-identifier weysure-postgres`).
 - Do not `terraform apply` while asleep — it sets the node group minimum back to 2 (a wake by accident).
 - Argo shows `root`, `karpenter-nodepools` and the `weysure-*` apps OutOfSync while asleep; that is the sleep state.
 - A commit to plateng-gitops while asleep is safe: the paused apps do not sync it until wake.

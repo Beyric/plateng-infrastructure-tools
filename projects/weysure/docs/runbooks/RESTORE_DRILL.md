@@ -6,10 +6,10 @@ the two stores of state that cannot be rebuilt from git can be brought back.
 | | Vault | RDS |
 |---|---|---|
 | Backup | Raft snapshot, daily 02:00 UTC + before every sleep → S3, 30 days | Automated backups + transaction logs, 7 days |
-| RPO (data you can lose) | up to 24 h | ~5 min |
+| RPO (data you can lose) | up to 24 h | ~5 min (measured 4 min 21 s) |
 | Drill script | `scripts/drill-vault-restore.sh` | `scripts/drill-rds-restore.sh` |
 | Where it runs | **your laptop**, Docker | a second RDS instance + a Job in the cluster |
-| Duration | ~1 min | ~25 min |
+| Duration | ~1 min (measured 41 s) | ~25 min (measured 17 min; data verified after 13) |
 | Cost | none | a few cents |
 | Touches production | reads one S3 object, uses the KMS key | reads backups; read-only queries |
 
@@ -126,5 +126,6 @@ prints, without needing the application image.
 | Date | Part | Result | RPO | Duration / RTO | Notes |
 |---|---|---|---|---|---|
 | 2026-09-28 | Vault — script only, **dummy data** | PASS | — | 27 s | Mechanics proven against a throw-away Vault sealed with the same KMS key. Not a drill. |
-| | Vault — production snapshot | | | | |
-| | RDS | | | | |
+| 2026-09-29 | Vault — production snapshot | **PASS** | 687 min (snapshot of 02:00 UTC) | **41 s** | Run by Adebayo on the laptop. KMS decrypt, login as a production user, 15 keys. |
+| 2026-09-29 | RDS | **PASS** | **261 s** | **13 min** restore → verified; 17 min 20 s including delete | Same schema version, tables and roles as production. Drill instance deleted, no leftover backups. |
+| *next: first week of January 2027* | | | | | |
