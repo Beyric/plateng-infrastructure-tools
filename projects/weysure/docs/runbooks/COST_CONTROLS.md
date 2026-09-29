@@ -231,3 +231,34 @@ and follow `DATABASE_RECOVERY.md`.
 3. Once both are done, update this file's "Dry-run status" and "Budget" sections with the real
    outcome (plan resource counts or the verbatim error) and tick the corresponding items in
    `projects/weysure/docs/checklist/BUILD_CHECKLIST.md`.
+
+## Reading the bill by usage type (2026-09-29)
+
+The service view hides things. "AmazonCloudWatch $1.71 a day" says nothing; the **usage type**
+`VendedLog-Bytes` says it is log ingestion, and `AWS/Logs IncomingBytes` per log group says which one.
+
+```bash
+aws ce get-cost-and-usage --time-period Start=<7 days ago>,End=<today> --granularity DAILY --metrics UnblendedCost --group-by Type=DIMENSION,Key=USAGE_TYPE --query 'ResultsByTime[-1].Groups[].[Metrics.UnblendedCost.Amount,Keys[0]]' --output text | sort -rn | head -15
+```
+Each Cost Explorer API call costs $0.01. Usage types with a region prefix other than `USE1` mean
+something is running in another region.
+
+| Found | Cost | Cause | Action |
+|---|---|---|---|
+| EKS control-plane logs | $51 / month | the EKS module enables `api`, `audit`, `authenticator` by default; 3.5 GB a day | off (`enabled_log_types = []`). Before go-live: `audit` back on |
+| `gym-app-stage`, t2.micro, ap-south-1 | $12.60 / month | not part of this platform; running since 2024-11 | owner's decision |
+
+Monthly habit: run the command above on the 1st and explain every line over $0.10 a day.
+
+## What is pinned, and why
+
+| Component | Pinned in | Upgrade is |
+|---|---|---|
+| Kubernetes version | `terraform.tfvars` | one hop per apply, `EKS_UPGRADE.md` |
+| System node AMI | `main.tf` `ami_release_version` | a one-line PR |
+| EKS add-ons (vpc-cni, coredns, kube-proxy, ebs-csi, pod-identity-agent) | `main.tf` `addon_version` — **since 2026-09-29** | a one-line PR each; vpc-cni follows `VPC_CNI_MODE_CHANGE.md` |
+| Helm charts | `targetRevision` in each Argo Application | a PR |
+| Images | tag = git SHA; third-party by version or digest | a PR |
+
+Until 2026-09-29 the add-ons followed "most recent": any apply that touched the cluster could have
+upgraded the VPC CNI without it being a decision.
