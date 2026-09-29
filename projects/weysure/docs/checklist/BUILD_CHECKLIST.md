@@ -15,7 +15,7 @@
 | 🔵 In progress | 1 — Phase 10 (hardening/DR) |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
-| 💰 Current AWS spend | **~$395/mo run-rate** ($13.0–13.3/day, 2026-09-22, monitoring included) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
+| 💰 Current AWS spend | **~$407/mo run-rate** ($13.57/day, 22–28 Sept, Cost Explorer; $356 once control-plane logs are off) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
 | 📐 Projected steady-state | **$300–320/mo** floor for this architecture (2 on-demand system nodes, NAT, RDS); ~$270 with a Savings Plan |
 | 📊 Diagrams | 10, all render-verified with `mmdc` |
 
@@ -232,7 +232,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Phase 10 — Production readiness 🔵 *([spec](../specs/2026-09-23-phase-10-hardening-dr.md) · [plan](../plans/2026-09-23-phase-10-hardening-dr.md))*
 
-- [x] 1 · Prefix delegation + max-pods 110 on system nodes *(infra #36)*
+- [x] 1 · Prefix delegation + max-pods 110 on system nodes *(infra #36; repaired by infra #40)*
 - [x] 2 · Hygiene: Karpenter series drop, LBC diff ignored, Vault restart-on-config, Access-aware probes *(gitops #50)*
 - [x] 3 · Vault snapshot identity, KMS deletion alarm, CloudTrail *(infra #36)*
 - [x] 4 · Vault snapshot CronJob + `VaultSnapshotMissing`; first snapshot verified in S3 *(gitops #51, 2026-09-28)*
@@ -243,15 +243,19 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] **RDS drill run; RPO and RTO recorded**
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [ ] 7 · forward-auth verifier + Traefik Middleware; Ingresses for prometheus/alertmanager/argocd
-- [ ] 8 · Vault config in Terraform (`vault` provider), plan = 0 changes
+- ⏸ 8 · Vault config in Terraform (`vault` provider), plan = 0 changes *(deferred 2026-09-29)*
 - [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
   - [x] healthchecks API key stored in Vault *(2026-09-28, 32 chars)*
   - [ ] **full rehearsal: sleep → 0 instances → wake → all green**
 - [x] Finding ㊺, second occurrence (2026-09-29): cause proven, prefix reservations in both private subnets, `scripts/subnet-blocks.sh` *(infra, this PR)*
-  - [ ] reservations applied
-  - [ ] node `ip-10-0-4-83` replaced; `subnet-blocks.sh` reports ok
+  - [x] reservations applied *(2026-09-29 12:10 UTC, 8 added)*
+  - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
+- [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra, this PR)*
+  - [ ] applied
+- [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
+- **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays).
 - [ ] 10 · SOP · overview · checklist close-out
 
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed

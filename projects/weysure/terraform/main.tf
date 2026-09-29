@@ -65,6 +65,15 @@ module "eks" {
   name               = local.cluster_name
   kubernetes_version = var.kubernetes_version
 
+  # Control-plane logs (api, audit, authenticator) are on by default in this
+  # module. They wrote 3.5 GB a day to CloudWatch - $51 a month, 13 % of the
+  # bill - and nobody read them (Cost Explorer, usage type VendedLog-Bytes,
+  # 2026-09-29). Off for a pre-launch platform. AWS API calls are still
+  # recorded by CloudTrail. Before go-live: turn "audit" back on and ship it
+  # somewhere cheaper than CloudWatch. The log group and what is already in it
+  # stay, and expire after 90 days.
+  enabled_log_types = []
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
@@ -82,12 +91,20 @@ module "eks" {
   # Finding ⑤: without vpc-cni pods get no IPs, without coredns nothing resolves,
   # and without the EBS CSI driver no PersistentVolume ever binds — which would
   # silently break Prometheus, Grafana, Vault and Redis.
+  # Versions are pinned (2026-09-29). The module's default is "most recent", which
+  # means ANY apply that touches the cluster could upgrade the VPC CNI - the
+  # component behind both Finding 45 incidents - without it appearing as a
+  # decision in a PR. Same rule as the node AMI: an upgrade is a deliberate
+  # one-line change, made on its own, following runbooks/VPC_CNI_MODE_CHANGE.md.
+  #   aws eks describe-addon-versions --addon-name vpc-cni --kubernetes-version 1.36 \
+  #     --query 'addons[0].addonVersions[].addonVersion'
   addons = {
-    coredns                = {}
-    eks-pod-identity-agent = { before_compute = true }
-    kube-proxy             = {}
+    coredns                = { addon_version = "v1.14.6-eksbuild.4" }
+    eks-pod-identity-agent = { before_compute = true, addon_version = "v1.4.0-eksbuild.2" }
+    kube-proxy             = { addon_version = "v1.36.0-eksbuild.25" }
     vpc-cni = {
       before_compute = true
+      addon_version  = "v1.23.1-eksbuild.1"
       # Phase 8 (spec D6): NetworkPolicy enforcement by the VPC CNI's eBPF agent,
       # no second CNI. Policies themselves live in plateng-gitops.
       # Phase 10 (spec D3, Finding 42): prefix delegation assigns /28 prefixes per
@@ -99,6 +116,7 @@ module "eks" {
       })
     }
     aws-ebs-csi-driver = {
+      addon_version = "v1.66.0-eksbuild.1"
       # The controller calls EC2 to create and attach volumes, so it needs an
       # AWS identity. enable_irsa below creates the OIDC provider - the trust
       # anchor - but grants nothing on its own. Without this association the
