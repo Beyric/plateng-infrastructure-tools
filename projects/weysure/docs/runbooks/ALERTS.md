@@ -22,6 +22,10 @@ api or web has fewer ready pods than desired for 10 min. `kubectl -n weysure-pro
 events: image pull (ECR), Kyverno admission, ResourceQuota exhausted, no workload node (see **NoWorkloadNode**), Vault
 agent init failing (`-c vault-agent` logs).
 
+Pods `ContainerCreating` with `failed to assign an IP address to container` = the node's subnet has no free address
+block: [VPC_CNI_MODE_CHANGE.md](VPC_CNI_MODE_CHANGE.md) → *Recovery — a new node cannot start any pod* (Finding ㊺).
+**If this alert resolves by itself, find out why before closing it** — it fired on 24 Sept, resolved, and came back on 29 Sept.
+
 ## Traefik5xxRateHigh
 More than 2 % (critical: 10 %) of requests to a service are 5xx. `kubectl -n weysure-prod logs deploy/api -c api` for
 tracebacks; correlate with the last promote commit in `images.yaml`; RDS alarms in CloudWatch. 502/504 with healthy
