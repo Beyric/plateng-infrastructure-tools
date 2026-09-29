@@ -248,6 +248,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
   - [x] healthchecks API key stored in Vault *(2026-09-28, 32 chars)*
   - [ ] **full rehearsal: sleep → 0 instances → wake → all green**
+- [x] Finding ㊺, second occurrence (2026-09-29): cause proven, prefix reservations in both private subnets, `scripts/subnet-blocks.sh` *(infra, this PR)*
+  - [ ] reservations applied
+  - [ ] node `ip-10-0-4-83` replaced; `subnet-blocks.sh` reports ok
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
 - [ ] 10 · SOP · overview · checklist close-out
 
@@ -286,8 +289,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Database cut-over rehearsal (restore → rename → Terraform import) | Needs downtime; the drill proves the data, not the switch | Before go-live | — |
 | PDBs: `unhealthyPodEvictionPolicy: AlwaysAllow` | Found by Finding ㊺; not blocking | Before the next node roll | — |
 | Blackbox 2 replicas + `absent(probe_success)` alert | Found by Finding ㊺; probes were blind for 30 min | Before go-live | — |
-| Replace mixed-mode node `ip-10-0-4-83` | Works today; spot node, will be replaced anyway | Next maintenance window | — |
-| Subnet CIDR reservations for /28 prefixes | ~165 free addresses per private /24, no fragmentation seen | Free addresses < 100 or `InsufficientCidrBlocks` | — |
+| Replace node `ip-10-0-4-83` | Holds 7 scattered addresses, blocks 6 blocks | **Now** — right after the reservations are applied | — |
+| **Larger subnets for nodes** (two /20, blue/green node groups) | A /24 has 14 usable /28 blocks; repaired with reservations for now | **Before go-live**, or `scripts/subnet-blocks.sh` exit 1 | — |
+| Alert on `awscni_aws_api_error_count` | The cause has no alert; replicas-missing fires 10 min later | With the next monitoring PR | — |
+| CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
 
 ## Resolved questions
 
