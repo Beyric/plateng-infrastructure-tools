@@ -615,3 +615,22 @@ are reserved for per-sync work (the migration Job). The Phase 5 Job is retired f
 
 **Consequences.** A new one-shot needs a new Job name (`db-grants-v2`). Completed Jobs accumulate
 as history — acceptable, and easier to audit than deleted hooks.
+
+## ADR-023 — Scope freeze: a practice platform stops building at "proven", not at "complete"
+
+**Date:** 2026-09-29 · **Status:** Accepted
+
+**Context.** The platform's purpose is learning and interview readiness, not a launch. September
+cost $624. Every remaining Phase 10 item (larger subnets, Vault config in Terraform, three more
+Ingresses, request right-sizing) is real work in a real company and would take days each, for a
+system that will be asleep most of the time.
+
+**Decision.** Finish only what turns a claim into a measurement or closes a known gap cheaply:
+restore drills (done), sleep and wake rehearsal, the verifier attached to Sonar. Everything else
+moves to the deferred list and is named in interviews as "what I would do next". api and web
+replicas may share one spot node (`ScheduleAnyway` stays): no spend on redundancy for a practice
+platform. The platform sleeps between sessions; a destroy date is Adebayo's decision.
+
+**Consequences.** The build checklist is honest about what is not proven (wake, verifier with a
+real token). Interview answers must say "designed for" where nothing was measured. Reviving the
+platform for real users starts from the deferred list, larger subnets first.
