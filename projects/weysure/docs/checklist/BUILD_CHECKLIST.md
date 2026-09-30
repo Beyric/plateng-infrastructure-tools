@@ -11,7 +11,7 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 9 / 11 phases — 0, 1, 2, 3, 4, 6, 7, 8, 9 · Phase 5 core done, restore drill deferred to 10 |
+| ✅ Complete | 10 / 11 phases — 0–9 and Phase 5's restore drill (done in 10) · Phase 10 shipped with 2 items open (wake, verifier attach) |
 | 🔵 In progress | 1 — Phase 10 (hardening/DR) · **platform asleep since 2026-09-29 14:15 UTC** |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
@@ -256,7 +256,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays).
-- [ ] 10 · SOP · overview · checklist close-out
+- [x] 10 · SOP [2026-09-29-phase-10-hardening-dr](../sop/2026-09-29-phase-10-hardening-dr.md) · overview · checklist *(2026-09-30; wake + verifier attach stay open above)* · ADR-023 scope freeze
 
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
 - [ ] SLOs and error budgets defined
