@@ -48,7 +48,7 @@ pass it for one run with `HC_API_KEY=… platform-sleep.sh`.
 **If it stops half-way, for any reason: run `platform-wake.sh`.** It returns to the state in git from
 any intermediate state.
 
-## Wake (~15–20 min)
+## Wake (~20–25 min)
 ```bash
 ~/Documents/beyric/projects/plateng-infra/plateng-infrastructure-tools/scripts/platform-wake.sh
 ```
@@ -80,13 +80,42 @@ chain down, and verify the pause before acting on it.**
 | 2026-09-23 | sleep v1 | failed | — | Argo reverted every change within seconds (Finding ㊹) |
 | 2026-09-23 | sleep v2 (infra #34) | not run | — | would have been reverted by `root` |
 | **2026-09-29** | **sleep v3 (infra #37)** | **PASS** | **21 min** (13:54 → 14:15 UTC) | Snapshot taken first. Pause held through the 45 s proof. Spot nodes gone in 1 min, RDS stopped after 8 min, system nodes gone after 17 min (EKS drain). healthchecks paused, HTTP 200. **0 instances.** |
-| | wake | **not run yet** | | the platform was left asleep on purpose |
+| **2026-10-01** | **wake v3, first run ever** | **FAILED, recovered by hand** | 1 h 45 min from first attempt to all green (20:15 → 22:01 UTC); asleep for 2 d 6 h | Three bugs, below. Final state: 32/32 apps, both sites 200, snapshot taken. |
+| | wake v4 (this fix) | not run yet | | next wake is its rehearsal |
+
+### What the first wake found (2026-10-01)
+| # | Symptom | Cause | Fix |
+|---|---|---|---|
+| 1 | `vault-0` Pending 30 min; script timed out twice | Vault's volumes are zonal (us-east-1b): one eligible node. It was Ready first and took 36 pods, 1915m of 1930m CPU requested | gitops: `priorityClassName: system-cluster-critical` on Vault; script now prints the scheduler's reason |
+| 2 | API at 0 pods for 45 min, `SiteDownExternal` critical | the script synced `weysure-api` 42 s after Vault was Ready; External Secrets had not reconnected; the PreSync ExternalSecret failed, 3 retries used up; **Argo does not retry a failed sync of the same commit** | script waits for `ClusterSecretStore vault` Ready (restarts ESO after 3 min) and re-syncs any app whose last sync failed |
+| 3 | `KubeJobFailed` ×2 | the 02:00 snapshot schedule fired twice with no nodes and failed at its deadline | script removes failed `vault-snapshot-*` Jobs before taking its own |
+
+Also seen: Jenkins woke with 10 queued builds (PRs opened while asleep); Karpenter launched one
+c7i-flex.2xlarge for them; the builds did not complete and must be re-run by the developers.
+
 
 Observed while asleep: 0 nodes, 0 instances, RDS `stopped`, 10 volumes kept, all five paused
 Applications still paused with their policy saved in the annotation, both sites unreachable.
 
+## Vault cannot be scheduled on wake (`Insufficient cpu` + `PersistentVolume's node affinity`)
+Should not happen once Vault has its priority class. If it does: free CPU on the node in Vault's zone.
+```bash
+kubectl get pv -o custom-columns='PVC:.spec.claimRef.name,ZONE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]' | command grep vault
+kubectl get nodes -L topology.kubernetes.io/zone,node-role
+kubectl cordon <system node in that zone>
+kubectl delete pod -n kyverno -l 'app.kubernetes.io/component in (background-controller,cleanup-controller,reports-controller)'
+kubectl uncordon <the same node>
+```
+The deleted pods restart on the other system node (the first is cordoned); Vault then fits. Run
+`platform-wake.sh` again — it is safe to re-run from any state.
+
+## API at 0 pods after wake, `weysure-api` OutOfSync with last sync `Failed`
+`kubectl patch app weysure-api -n argocd --type merge -p '{"operation":{"sync":{}}}'` — once
+`kubectl get clustersecretstore vault` says `True`.
+
 ## Rules
 - Sites are **down** while asleep. Never sleep once there are users.
+- **Tell the developers before sleeping and after waking.** While asleep they have no CI and no production; an unannounced sleep reads as an outage (developer note, 2026-09-30). Their queued builds fail at wake and must be re-run.
 - **Nothing watches the platform while it is asleep**: Prometheus and Alertmanager are off, healthchecks.io is paused. Argo CD is off too: a merge to plateng-gitops is applied only at wake — do not merge what you will not be there to watch.
 - Never sleep a platform that is not healthy: Vault down, a node group update in progress or failed, or apps Degraded.
   Fix first. Sleeping hides the fault and makes the wake harder (Finding ㊺). The snapshot in step 1 fails if Vault is down.

@@ -12,7 +12,7 @@
 | Status | Count |
 |---|---|
 | ✅ Complete | 10 / 11 phases — 0–9 and Phase 5's restore drill (done in 10) · Phase 10 shipped with 2 items open (wake, verifier attach) |
-| 🔵 In progress | 1 — Phase 10 (hardening/DR) · **platform asleep since 2026-09-29 14:15 UTC** |
+| 🔵 In progress | 1 — Phase 10 (hardening/DR) · platform awake again 2026-10-01 22:01 UTC |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
 | 💰 Current AWS spend | **~$407/mo run-rate** ($13.57/day, 22–28 Sept, Cost Explorer; $356 once control-plane logs are off) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
@@ -248,7 +248,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
   - [x] healthchecks API key stored in Vault *(2026-09-28, 32 chars)*
   - [x] **sleep rehearsed: 0 instances in 21 min** *(2026-09-29)*
-  - [ ] **wake rehearsed: all green** — platform left asleep on purpose
+  - [x] **wake run for the first time 2026-10-01: failed, three bugs found, recovered by hand to all green**
+  - [x] wake v4: Vault priority class *(gitops #54)*, wait for the secret store, re-sync failed apps, clean failed snapshot Jobs *(infra, this PR)*
+  - [ ] wake v4 rehearsed
 - [x] Finding ㊺, second occurrence (2026-09-29): cause proven, prefix reservations in both private subnets, `scripts/subnet-blocks.sh` *(infra, this PR)*
   - [x] reservations applied *(2026-09-29 12:10 UTC, 8 added)*
   - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
