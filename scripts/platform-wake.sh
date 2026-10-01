@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wake beyric-prod after platform-sleep.sh. ~15-20 minutes to all-green.
+# Wake beyric-prod after platform-sleep.sh. ~20-25 minutes to all-green.
 # Safe to run from any half-asleep state, and safe to run twice.
 # Runbook: projects/weysure/docs/runbooks/SLEEP_WAKE.md
 set -euo pipefail
@@ -26,7 +26,18 @@ aws eks update-nodegroup-config --cluster-name $CLUSTER --nodegroup-name "$NG" -
 echo "[3/8] wait for two system nodes, Vault (auto-unseal), Karpenter, Argo CD"
 until [[ $(kubectl get nodes -l node-role=system --no-headers 2>/dev/null | grep -c ' Ready') -ge 2 ]]; do sleep 15; done
 until kubectl get pod vault-0 -n vault >/dev/null 2>&1; do sleep 5; done
-kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=10m
+# Vault's volumes are zonal: it fits on one system node only. If that node filled
+# up before Vault was scheduled (first wake, 2026-10-01), say so instead of
+# timing out silently. gitops gives Vault a priority class so this should not recur.
+for i in $(seq 1 90); do
+  kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=10s >/dev/null 2>&1 && break
+  if (( i % 9 == 0 )) && [[ "$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}')" == "Pending" ]]; then
+    echo "  vault-0 is still Pending: $(kubectl get events -n vault --field-selector involvedObject.name=vault-0,reason=FailedScheduling --sort-by=.lastTimestamp -o jsonpath='{range .items[*]}{.message}{"\n"}{end}' 2>/dev/null | grep 'nodes are available' | tail -1 | cut -c1-160)"
+    echo "  if 'Insufficient cpu': runbook SLEEP_WAKE.md -> 'Vault cannot be scheduled on wake'"
+  fi
+  [[ "$i" == 90 ]] && { echo "  vault-0 not Ready after 15 min - stopping. Nothing below would work without Vault."; exit 1; }
+done
+echo "  vault-0 Ready"
 kubectl rollout status deploy/karpenter -n kube-system --timeout=10m
 kubectl rollout status deploy/argocd-server -n argocd --timeout=10m
 kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=10m
@@ -40,7 +51,18 @@ for i in $(seq 1 40); do
 done
 [[ -n "$AM" ]] || echo "  Alertmanager not up after 10 min - continuing without a wake silence (expect alerts in Slack)"
 
-echo "[5/8] give the cluster back to git: restore root's automated sync, sync root, then the paused apps"
+echo "[5/8] wait until secrets can be fetched, then give the cluster back to git"
+# The application's first sync step is an ExternalSecret. External Secrets started
+# before Vault and keeps a dead client for a few minutes: a sync fired now fails,
+# exhausts its retries, and Argo never retries the same commit by itself (API
+# stayed at 0 pods for 45 min on 2026-10-01).
+for i in $(seq 1 40); do
+  [[ "$(kubectl get clustersecretstore vault -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)" == "True" ]] && break
+  [[ "$i" == 12 ]] && { echo "  secret store not ready after 3 min - restarting External Secrets (it holds a dead Vault client)"; kubectl rollout restart deploy/external-secrets -n external-secrets >/dev/null; }
+  [[ "$i" == 40 ]] && { echo "  ClusterSecretStore 'vault' not Ready after 10 min - stopping before syncing the applications."; exit 1; }
+  sleep 15
+done
+echo "  ClusterSecretStore vault: Ready"
 kubectl patch nodepool default --type merge -p '{"spec":{"limits":{"cpu":"32"}}}'   # git value; the sync below is what makes it authoritative
 saved=$(kubectl get app root -n argocd -o jsonpath="{.metadata.annotations.beyric\.io/sleep-automated}" 2>/dev/null || true)
 kubectl patch app root -n argocd --type merge -p "{\"spec\":{\"syncPolicy\":{\"automated\":${saved:-$ROOT_DEFAULT}}}}" >/dev/null
@@ -63,11 +85,22 @@ for i in $(seq 1 80); do
   bad=$(kubectl get app -n argocd --no-headers 2>/dev/null | awk '$2!="Synced"||$3!="Healthy"{printf "%s ",$1}')
   codes=""; for u in $SITES; do codes="$codes$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$u") "; done
   [[ -z "$bad" && "$codes" == "200 200 " ]] && { ok=1; break; }
+  for app in $CHILD_APPS; do      # Argo does not retry a failed sync of the same commit by itself
+    ph=$(kubectl get app "$app" -n argocd -o jsonpath='{.status.operationState.phase}' 2>/dev/null || true)
+    if [[ "$ph" == "Failed" || "$ph" == "Error" ]]; then
+      echo "  $app: last sync $ph - syncing again"
+      kubectl patch app "$app" -n argocd --type merge -p '{"operation":{"sync":{}}}' >/dev/null 2>&1 || true
+    fi
+  done
   (( i % 4 == 0 )) && echo "  sites: $codes| not ready: ${bad:-none}"
   sleep 15
 done
 
 echo "[8/8] snapshot if the last one is older than 20h, then lift the silences"
+# The 02:00 schedule fires while asleep, finds no node, and fails at its deadline.
+for j in $(kubectl get job -n vault -o json 2>/dev/null | python3 -c 'import sys,json; [print(j["metadata"]["name"]) for j in json.load(sys.stdin)["items"] if j["metadata"]["name"].startswith("vault-snapshot-") and any(c["type"]=="Failed" and c["status"]=="True" for c in j.get("status",{}).get("conditions",[]))]' || true); do
+  kubectl delete job -n vault "$j" >/dev/null 2>&1 && echo "  removed failed job $j (ran while asleep)"
+done
 last=$(kubectl get cronjob vault-snapshot -n vault -o jsonpath='{.status.lastSuccessfulTime}' 2>/dev/null || true)
 age=$(python3 -c "import sys,datetime as d; t=sys.argv[1]; print(int((d.datetime.now(d.timezone.utc)-d.datetime.fromisoformat(t.replace('Z','+00:00'))).total_seconds()//3600) if t else 999)" "$last")
 if (( age >= 20 )); then kubectl create job -n vault --from=cronjob/vault-snapshot "vault-snapshot-wake-$(date -u +%Y%m%d%H%M%S)" >/dev/null && echo "  snapshot job started (last success ${age}h ago)"; else echo "  last snapshot ${age}h ago - fine"; fi
