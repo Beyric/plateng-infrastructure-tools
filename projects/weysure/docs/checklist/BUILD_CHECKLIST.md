@@ -242,7 +242,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] **Vault drill run on the production snapshot: PASS, 41 s** *(2026-09-29)*
   - [x] **RDS drill run: PASS, RPO 261 s, RTO 13 min** *(2026-09-29)*
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
-- [ ] 7 · forward-auth verifier + Traefik Middleware; Ingresses for prometheus/alertmanager/argocd
+- [ ] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
+  - [ ] real Access token accepted (first browser login after the merge)
+  - ⏸ Jenkins (needs the `/github-webhook/` exemption), Prometheus/Alertmanager/Argo CD Ingresses — deferred, ADR-023
 - ⏸ 8 · Vault config in Terraform (`vault` provider), plan = 0 changes *(deferred 2026-09-29)*
 - [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
   - [x] scripts rewritten; every read and patch dry-run against the live cluster
@@ -255,6 +257,12 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] reservations applied *(2026-09-29 12:10 UTC, 8 added)*
   - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
+- [x] Developer handover items 1 and 3 closed: `/tmp` only, migration Job without app secrets *(gitops #55, 2026-10-01)*
+- [ ] KYC secrets for the developers' phases 2–3 *(developer note 2026-10-02)*
+  - [ ] `KYC_FINGERPRINT_KEY` generated in Vault, snapshot taken, break-glass copy in Secrets Manager *(infra, this PR)*
+  - [ ] `TERMII_API_KEY`, `DOJAH_API_KEY`, `DOJAH_WEBHOOK_SECRET` in Vault
+  - [ ] 14 non-secret values in the API ConfigMap
+- ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays).

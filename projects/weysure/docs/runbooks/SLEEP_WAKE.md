@@ -113,6 +113,20 @@ The deleted pods restart on the other system node (the first is cordoned); Vault
 `kubectl patch app weysure-api -n argocd --type merge -p '{"operation":{"sync":{}}}'` — once
 `kubectl get clustersecretstore vault` says `True`.
 
+## After a wake or a burst of builds: check the application node's size
+Karpenter sizes a node for everything pending at that moment. At wake that includes queued Jenkins
+builds (ten on 2026-10-01 → one `c7i-flex.2xlarge`, $3.60/day, 22 % used). The builds end; the
+application stays on the big node, and Karpenter cannot shrink it because Redis carries `do-not-disrupt`.
+```bash
+kubectl get nodes -l node-role=workload -L node.kubernetes.io/instance-type
+```
+Anything larger than `xlarge` holding the application: replace it (`VPC_CNI_MODE_CHANGE.md` →
+*Replacing a workload node*: delete the NodeClaim, then the Redis pod). Done 2026-10-01: → `large`,
+$0.91/day, no failed request. The lasting fix is a separate NodePool for CI (deferred, ADR-023).
+
+Spot reclaims are normal: 2026-10-02 the application's node was reclaimed twice in ten minutes
+(08:05 and 08:13 WAT); replicas never went below 1, no probe failed, no alert fired.
+
 ## Rules
 - Sites are **down** while asleep. Never sleep once there are users.
 - **Tell the developers before sleeping and after waking.** While asleep they have no CI and no production; an unannounced sleep reads as an outage (developer note, 2026-09-30). Their queued builds fail at wake and must be re-run.

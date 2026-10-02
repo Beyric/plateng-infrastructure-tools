@@ -31,6 +31,16 @@ More than 2 % (critical: 10 %) of requests to a service are 5xx. `kubectl -n wey
 tracebacks; correlate with the last promote commit in `images.yaml`; RDS alarms in CloudWatch. 502/504 with healthy
 pods = readiness/timeout mismatch at Traefik.
 
+## EdgeAuthDown
+`edge-auth/access-verify` has no ready pod. Traefik fails closed: every host that carries the
+`access-verify` middleware (SonarQube since 2026-10-02) answers 401/500 to everyone, logged in or not.
+weysure and weysure-api are not behind it. `kubectl get pods -n edge-auth`; `kubectl logs -n edge-auth
+-l app.kubernetes.io/name=access-verify --tail=20` — `keys-error` means it cannot reach
+`beyric.cloudflareaccess.com` for the signing keys (NAT, DNS, NetworkPolicy). A logged-in user who is
+refused shows as a `deny` line with the reason (`audience`, `expired`, `issuer`, `unknown key`).
+To open the door while you fix it: remove the `router.middlewares` annotation from the Ingress (gitops
+`bootstrap/apps/sonarqube.yaml`) — Cloudflare Access still protects the hostname.
+
 ## TLSCertExpiringSoon
 cert-manager renews 30 days before expiry, so < 14 days means renewal is failing. `kubectl describe certificate <name>
 -n <ns>` → the Order/Challenge events: Cloudflare token invalid (Vault `platform/cloudflare`), DNS-01 propagation, or
