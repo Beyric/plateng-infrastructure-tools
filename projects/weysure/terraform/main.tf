@@ -259,16 +259,33 @@ resource "aws_ecr_repository" "web" {
 }
 
 # Untagged images accumulate on every build and are pure cost.
+#
+# PR and branch builds are tagged <job>-<sha12>-b<build> (Jenkinsfile in both app
+# repos); main builds get the bare 12-hex SHA, and only those are promoted to
+# gitops. ECR lifecycle rules have no regex, only prefixes and '*' wildcards, so
+# "not ^[0-9a-f]{12}$" is written as '*-b*': every branch tag contains "-b", and
+# a SHA has no hyphen. Main images are never matched.
+#
+# Not covered: Kaniko's build cache (64-hex tags, --cache-repo is this same repo)
+# cannot be told apart from main SHAs by a wildcard. It needs its own repository.
 resource "aws_ecr_lifecycle_policy" "expire_untagged" {
   for_each   = { api = aws_ecr_repository.api.name, web = aws_ecr_repository.web.name }
   repository = each.value
 
   policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Expire untagged images after 7 days"
-      selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 7 }
-      action       = { type = "expire" }
-    }]
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged images after 7 days"
+        selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 7 }
+        action       = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Expire PR and branch builds (<job>-<sha12>-b<build>) after 7 days"
+        selection    = { tagStatus = "tagged", tagPatternList = ["*-b*"], countType = "sinceImagePushed", countUnit = "days", countNumber = 7 }
+        action       = { type = "expire" }
+      },
+    ]
   })
 }
