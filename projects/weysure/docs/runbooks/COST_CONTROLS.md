@@ -190,6 +190,37 @@ Then confirm `terraform.tfvars` never shows in `git status --short` (it is `.git
 | Cloudflare | **0** (free plan) |
 | **Total** | **240–270** |
 
+## ECR image retention
+
+Lifecycle policy on `weysure-api` and `weysure-web` (`terraform/main.tf`, `aws_ecr_lifecycle_policy.expire_untagged`):
+
+| Images | Tag shape | Kept |
+|---|---|---|
+| main builds (gitops promotes only these) | 12-hex SHA, `0dd54eb1e601` | forever |
+| PR / branch builds | `<job>-<sha12>-b<build>`, `pr-36-e69947ea37af-b1` | 7 days (`*-b*`) |
+| untagged | none | 7 days |
+| Kaniko build cache | 64-hex | **forever: not covered** |
+
+ECR rules have no regex, only prefixes and `*`, so "not a 12-hex SHA" is written as `*-b*`
+(a SHA has no hyphen). The cache shares the repo (`--cache-repo $ECR/$IMAGE` in both
+Jenkinsfiles) and no wildcard separates 64-hex from 12-hex. Fix when it matters: a separate
+`<repo>-cache` repository with an "any, 7 days" rule (needs a Jenkinsfile change and Jenkins
+push access). 2026-10-03: cache was 0.9 GB (api) + 3.8 GB (web), about $0.50/mo.
+
+Check a rule before applying it, with ECR's dry run (deletes nothing, does not change the policy):
+
+```bash
+aws ecr start-lifecycle-policy-preview --repository-name weysure-api --lifecycle-policy-text file://policy.json --profile beyric-admin
+```
+
+```bash
+aws ecr get-lifecycle-policy-preview --repository-name weysure-api --profile beyric-admin
+```
+
+A preview that expires nothing proves nothing when the images are younger than the rule's
+age. Test the pattern with `"countType": "imageCountMoreThan", "countNumber": 1` instead, which
+selects by count and lists every image the pattern matches.
+
 ## If a budget alert fires
 
 1. **Cost Explorer → Group by Service** — find which service moved.
