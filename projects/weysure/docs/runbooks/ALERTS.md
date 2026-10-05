@@ -105,6 +105,13 @@ by itself. Fires once per increase and clears after 10 min. The worker's log lin
 developers' jobs SOP, after fixing the cause. Critical because later job types move money: treat a dead payout or refund
 as an incident and tell the developers.
 
+## JobsStatsMissing
+From the Loki ruler: no `"event": "jobs_stats"` line from api-worker for 15 min (+5 min `for`). Either the worker is
+down (**DeploymentReplicasMissing** fires too), its loop is stuck (liveness should restart it within ~6 min: check
+`kubectl -n weysure-prod get pods -l app.kubernetes.io/name=api-worker` restart count), or its logs are not reaching
+Loki (Alloy down on that node: `kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy -o wide`). While asleep
+this is expected and silenced by platform-sleep.sh.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -113,4 +120,4 @@ at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
 Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring get pods`; PVC full
 (`kubectl -n monitoring get pvc`); a system node roll. If **Prometheus** is down no other alert can fire — this is the
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
-log-based alerts (JobsQueueLagging, JobsDeadIncreased) cannot fire either.
+log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing) cannot fire either.

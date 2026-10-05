@@ -12,7 +12,7 @@ record. Log in first: `kubectl exec -n vault -it vault-0 -- vault login -method=
 | policy `weysure-db-migrate` | read `database/creds/weysure-migrate` |
 | policy `db-bootstrap` | manage `database/config/weysure`, `database/roles/*` (one-shot Jobs) |
 | k8s role `external-secrets` | SA `external-secrets/external-secrets` → `platform-read`, `weysure-read` (no audience yet) |
-| k8s role `weysure-api` | SAs `weysure-prod/{api,api-scheduler}` → `weysure-db-app`; ttl 1h, max 24h; audience `https://kubernetes.default.svc` |
+| k8s role `weysure-api` | SAs `weysure-prod/{api,api-scheduler,api-worker}` (api-worker added 2026-10-04) → `weysure-db-app`; ttl 1h, max 24h; audience `https://kubernetes.default.svc` |
 | k8s role `weysure-migrate` | SA `weysure-prod/db-migrate` → `weysure-db-migrate`; ttl 30m, max 1h; same audience |
 | k8s role `db-bootstrap` | SA `weysure-prod/db-bootstrap` → `db-bootstrap` |
 | policy `vault-snapshot` | read `sys/storage/raft/snapshot` - nothing else (2026-09-28) |

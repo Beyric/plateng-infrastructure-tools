@@ -39,7 +39,7 @@ pass it for one run with `HC_API_KEY=… platform-sleep.sh`.
 | 3 | Pause Argo automated sync: **`root` first**, then `karpenter-nodepools`, `weysure-prod`, `weysure-api`, `weysure-web` | `root` (selfHeal) owns the child Applications and re-applies them. The old policy is saved in the annotation `beyric.io/sleep-automated`. |
 | 4 | Wait 45 s and check the pause is still in place | Argo reverts within seconds when it is going to. Fails here = nothing is scaled down yet. |
 | 5 | NodePool cpu limit 0 | Karpenter must not replace what is about to be removed. |
-| 6 | api, api-scheduler, web, redis → 0 | PDBs would block the last eviction; Redis carries `do-not-disrupt`. |
+| 6 | api, api-scheduler, api-worker, web, redis → 0 | PDBs would block the last eviction; Redis carries `do-not-disrupt`. |
 | 7 | Delete NodeClaims; poll EC2 until 0 Karpenter instances | Karpenter must be alive to terminate its own instances, or they are orphaned and keep billing. |
 | 8 | Pause healthchecks.io; system node group → 0 | |
 | 9 | Stop RDS | |
