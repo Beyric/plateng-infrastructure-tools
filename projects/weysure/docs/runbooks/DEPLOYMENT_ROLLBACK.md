@@ -40,6 +40,21 @@ Order:
 Follow the developers' release note for *what* to clean up; this runbook is *how*. If a downgrade is not
 safe (data written to new columns that must survive), stop and write a forward fix instead.
 
+### Weysure-API #44 (P2P auto-release, migration `c3e8a1f4b7d2`)
+
+From the developers (platform-note-2026-10-05b). `<pr44-tag>` = the promote tag of #44, `<prev-tag>` the one before.
+Downgrade is money-safe: it drops only `delivery_method_settings`, `escrow_transactions.auto_release_at` and
+`.timers_paused_at` (checked in the migration). Prefer the off switch (`JOBS_DISABLED_KINDS`, once shipped) or a fix forward.
+
+| Step | Command |
+|---|---|
+| 1 | git: `api-worker.replicas: 0` → PR → merge, wait for the worker pod to go |
+| 2 | `scripts/db-oneoff.sh <pr44-tag> read "SELECT subject_id FROM jobs WHERE kind='escrow.release_notify' AND status IN ('pending','paused','running')"` → send the ids to the developers |
+| 3 | `scripts/db-oneoff.sh <pr44-tag> write "UPDATE jobs SET status='cancelled', completed_at=(now() AT TIME ZONE 'utc'), updated_at=(now() AT TIME ZONE 'utc'), locked_by=NULL, locked_at=NULL WHERE kind LIKE 'escrow.%' AND status IN ('pending','paused','running')"` |
+| 4 | `scripts/db-oneoff.sh <pr44-tag> alembic "downgrade 9b2e7c4d1a30"` (quiet window: the #44 API errors on escrow reads until step 5) |
+| 5 | revert the promote commit of `<pr44-tag>` (*Image only*) |
+| 6 | step 3 again, then git: `api-worker.replicas: 1` |
+
 ## One-off database commands: `scripts/db-oneoff.sh`
 
 Runs one SQL statement or one alembic command as a Job with the migration's identity (ServiceAccount
