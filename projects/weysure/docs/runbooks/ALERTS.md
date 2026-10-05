@@ -1,6 +1,6 @@
 # Runbook — alerts
 
-Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` links here. Critical → `#beyric-alerts-critical`
+Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` (Prometheus) and `loki-rules-jobs.yaml` (Loki ruler, log-based) links here. Critical → `#beyric-alerts-critical`
 (repeats every 4 h), warning → `#beyric-alerts-warning` (12 h). First move for anything red: `kubectl get app -n argocd`
 and the Grafana **Cluster overview** dashboard. Kubernetes-level alerts (KubePodCrashLooping, KubeJobFailed,
 KubeNodeNotReady, KubePersistentVolumeFillingUp) come from kube-prometheus-stack's defaults and follow the same channels.
@@ -18,7 +18,7 @@ CrashLoop; `kubectl -n weysure-prod logs deploy/api -c api --tail=100`; a failed
 with [DEPLOYMENT_ROLLBACK.md](DEPLOYMENT_ROLLBACK.md).
 
 ## DeploymentReplicasMissing
-api or web has fewer ready pods than desired for 10 min. `kubectl -n weysure-prod describe deploy <name>` and the pod
+api, web or api-worker has fewer ready pods than desired for 10 min. `kubectl -n weysure-prod describe deploy <name>` and the pod
 events: image pull (ECR), Kyverno admission, ResourceQuota exhausted, no workload node (see **NoWorkloadNode**), Vault
 agent init failing (`-c vault-agent` logs).
 
@@ -89,6 +89,22 @@ raise `consolidateAfter` in `platform/karpenter/nodepool.yaml`; drift → an AMI
 No Karpenter node for 10 min. Expected while asleep. Otherwise Karpenter cannot launch: its logs, the NodePool
 `limits` (sleep sets cpu 0 — did wake restore it?), spot capacity in both AZs, the EC2 spot service-linked role.
 
+## JobsQueueLagging
+From the Loki ruler, not Prometheus: the oldest overdue job in the Postgres `jobs` table has waited more than 5 min
+(api-worker logs one `"event": "jobs_stats"` line a minute). Escrow timers (auto-release, deadlines, expiries, dispute
+escalation) are running late. `kubectl -n weysure-prod get pods -l app.kubernetes.io/name=api-worker` (0 pods or
+restarting → **DeploymentReplicasMissing** / KubePodCrashLooping first); `kubectl -n weysure-prod logs deploy/api-worker
+-c api-worker --tail=50`: DB errors (Vault lease, RDS), Paystack/SMTP timeouts, or a single slow job. A hung worker is
+restarted by liveness within ~6 min (heartbeat stops after 5 min without progress). Jobs are never lost: they wait in the
+table. More replicas are safe (`SKIP LOCKED`) if the queue is just long.
+
+## JobsDeadIncreased
+From the Loki ruler: a job used all its attempts (`JOBS_MAX_ATTEMPTS`, default 8) and is now `dead`. It never runs again
+by itself. Fires once per increase and clears after 10 min. The worker's log line before it says which job and why
+(`kubectl -n weysure-prod logs deploy/api-worker -c api-worker --since=30m | grep -i dead`). Re-queue or cancel it with the
+developers' jobs SOP, after fixing the cause. Critical because later job types move money: treat a dead payout or refund
+as an incident and tell the developers.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -96,4 +112,5 @@ at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
 ## MonitoringStackDegraded
 Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring get pods`; PVC full
 (`kubectl -n monitoring get pvc`); a system node roll. If **Prometheus** is down no other alert can fire — this is the
-one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog).
+one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
+log-based alerts (JobsQueueLagging, JobsDeadIncreased) cannot fire either.
