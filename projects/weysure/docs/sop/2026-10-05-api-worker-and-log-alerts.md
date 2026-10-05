@@ -1,7 +1,7 @@
 # SOP — api-worker (background jobs) and log-based alerts
 
 **Shipped:** 2026-10-04 → 2026-10-05 · **PRs:** gitops #59 (prepare, off), #60 (Loki ruler), #61 (switch on),
-#62 (restart-pattern fix) · infra #47, #48 · app: Weysure-API #43 (`710208c2c6d4`) ·
+#62 (restart-pattern fix), #63 (`replicas: 0`) · infra #47, #48, #49, #50 (`db-oneoff.sh`, rollback runbook) · app: Weysure-API #43 (`710208c2c6d4`) ·
 **Cost delta:** ≈ $0 (120m CPU / 288Mi requested on existing nodes) ·
 Developer notes: `weysure/docs/platform-note-2026-10-03b.md`, `platform-note-2026-10-04.md`; reply
 `platform-reply-2026-10-04.md` · Runbooks: [ALERTS](../runbooks/ALERTS.md), [SLEEP_WAKE](../runbooks/SLEEP_WAKE.md),
@@ -24,6 +24,8 @@ Developer notes: `weysure/docs/platform-note-2026-10-03b.md`, `platform-note-202
 | **End-to-end rule test** — real Loki 3.6.11 + Alertmanager in Docker, 5 scenarios | gitops `platform/monitoring/tests/loki-rules-test.sh` | all PASS |
 | `DeploymentReplicasMissing` covers api-worker | gitops `platform/monitoring/alerts.yaml` (#59) | promtool OK |
 | **Sleep** scales api-worker to 0 with the other app Deployments | infra `scripts/platform-sleep.sh` (#48) | bash dry-run on the live cluster |
+| **`scripts/db-oneoff.sh`** — one SQL statement (`read` in a read-only transaction / `write`) or one alembic command as a Job with the migration's identity, rendered from the chart | infra `scripts/` (#50) | real API image vs Postgres 16: read refuses `UPDATE`, write commits, alembic builds the schema; server dry run accepted by Kyverno |
+| **Chart: `replicas: 0` renders 0** (was 1: `default` treats 0 as unset) — the worker is stopped in git during a rollback | gitops #63 | render test fails without the fix |
 
 ## Why
 
@@ -84,7 +86,9 @@ access, and alert when the queue is late or a job gives up.
 - Logs: `kubectl -n weysure-prod logs deploy/api-worker -c api-worker --tail=20`. Queue numbers for people:
   `GET /api/v1/admin/jobs/stats` (admin auth).
 - More throughput: raise `replicas` (safe: `SKIP LOCKED`, no leader election).
-- Off: `enabled: false` in values, or revert #61. Jobs wait in the table; nothing is lost.
+- Off: `replicas: 0` (keeps the objects) or `enabled: false` in values. Jobs wait in the table; nothing is lost.
+  Not `kubectl scale`: the next sync re-applies git.
+- **Rolling back a release that added a migration:** downgrade with the NEW image first (`db-oneoff.sh <new-tag> alembic "downgrade <rev>"`), then revert the image. The other order fails at PreSync: the old image cannot locate the newer revision (proven). [DEPLOYMENT_ROLLBACK.md](../runbooks/DEPLOYMENT_ROLLBACK.md).
 - Re-run the rule test after any change to `loki-rules-jobs.yaml`: `bash platform/monitoring/tests/loki-rules-test.sh` (~4 min).
 - Sleep stops the worker before RDS; wake restores `replicas: 1` from git.
 
