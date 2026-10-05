@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-09-28 (Phase 10 in progress: tasks 1-4, 6 done)
+> **Last reconciled:** 2026-10-05 (Phase 10 shipped under ADR-023; developer support: KYC P2/P3 config, prelaunch, ECR expiry, api-worker + log alerts)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -11,8 +11,8 @@
 
 | Status | Count |
 |---|---|
-| ✅ Complete | 10 / 11 phases — 0–9 and Phase 5's restore drill (done in 10) · Phase 10 shipped with 2 items open (wake, verifier attach) |
-| 🔵 In progress | 1 — Phase 10 (hardening/DR) · platform awake again 2026-10-01 22:01 UTC |
+| ✅ Complete | 10 / 11 phases — 0–9 and Phase 5's restore drill (done in 10) · Phase 10 shipped with 1 item open (wake v4 rehearsal) |
+| 🔵 In progress | 1 — Phase 10 (hardening/DR) · platform awake since 2026-10-01 22:01 UTC; supporting the developers' releases |
 | ❓ Blocking questions | **0** — all three resolved |
 | ⚪ Planned | 10 |
 | 💰 Current AWS spend | **~$407/mo run-rate** ($13.57/day, 22–28 Sept, Cost Explorer; $356 once control-plane logs are off) — was ~$750/mo on extended support; Graviton and the legacy NLB removal are in; Savings Plan is the next lever |
@@ -242,8 +242,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] **Vault drill run on the production snapshot: PASS, 41 s** *(2026-09-29)*
   - [x] **RDS drill run: PASS, RPO 261 s, RTO 13 min** *(2026-09-29)*
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
-- [ ] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
-  - [ ] real Access token accepted (first browser login after the merge)
+- [x] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
+  - [x] real Access token accepted *(156 requests 200/304 with real tokens, 2026-10-02)*
   - ⏸ Jenkins (needs the `/github-webhook/` exemption), Prometheus/Alertmanager/Argo CD Ingresses — deferred, ADR-023
 - ⏸ 8 · Vault config in Terraform (`vault` provider), plan = 0 changes *(deferred 2026-09-29)*
 - [ ] 9 · Sleep/wake: pause `root` first, snapshot before sleep, healthchecks pause
@@ -258,10 +258,19 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
 - [x] Developer handover items 1 and 3 closed: `/tmp` only, migration Job without app secrets *(gitops #55, 2026-10-01)*
-- [ ] KYC secrets for the developers' phases 2–3 *(developer note 2026-10-02)*
-  - [ ] `KYC_FINGERPRINT_KEY` generated in Vault, snapshot taken, break-glass copy in Secrets Manager *(infra, this PR)*
-  - [ ] `TERMII_API_KEY`, `DOJAH_API_KEY`, `DOJAH_WEBHOOK_SECRET` in Vault
-  - [ ] 14 non-secret values in the API ConfigMap
+- [x] KYC secrets for the developers' phases 2–3 *(developer note 2026-10-02)*
+  - [x] `KYC_FINGERPRINT_KEY` generated in Vault, snapshot taken, break-glass copy in Secrets Manager *(infra #45)*
+  - [x] `TERMII_API_KEY`, `DOJAH_API_KEY`, `DOJAH_WEBHOOK_SECRET` in Vault *(verified in the pod by length, 2026-10-02)*
+  - [x] 14 non-secret values in the API ConfigMap *(gitops #57; KYC P2 live 2026-10-02, P3 Weysure-API #36 live 2026-10-03)*
+- [x] `ENVIRONMENT=prelaunch` — #36's guard refuses `production` with Dojah sandbox; render test rejects fake-provider envs *(gitops #58, 2026-10-03)*
+- [x] ECR: PR/branch images (`*-b*`) expire after 7 days on both repos; lifecycle preview proved 0 main SHAs selected *(infra #46, 2026-10-03)*
+- [x] **api-worker** (Postgres jobs queue) — [SOP](../sop/2026-10-05-api-worker-and-log-alerts.md)
+  - [x] chart: exec probes, per-component Vault restart command; worker prepared off *(gitops #59)*
+  - [x] Vault role `weysure-api` binds `api-worker` *(2026-10-04)*
+  - [x] Loki ruler → Alertmanager; `JobsQueueLagging`, `JobsDeadIncreased` + Docker end-to-end test *(gitops #60, infra #47)*
+  - [x] switched on after Weysure-API #43 was promoted; `JobsStatsMissing` *(gitops #61, 2026-10-05)*
+  - [x] restart-on-first-render bug fixed: anchored pattern, 0 restarts *(gitops #62)*
+  - [x] sleep stops api-worker *(infra #48)*
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -307,6 +316,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | **Larger subnets for nodes** (two /20, blue/green node groups) | A /24 has 14 usable /28 blocks; repaired with reservations for now | **Before go-live**, or `scripts/subnet-blocks.sh` exit 1 | — |
 | Alert on `awscni_aws_api_error_count` | The cause has no alert; replicas-missing fires 10 min later | With the next monitoring PR | — |
 | CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
+| `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | Decide: disable in kube-prometheus-stack values, or accept | — |
+| Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
+| Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 
 ## Resolved questions
 
