@@ -271,6 +271,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] switched on after Weysure-API #43 was promoted; `JobsStatsMissing` *(gitops #61, 2026-10-05)*
   - [x] restart-on-first-render bug fixed: anchored pattern, 0 restarts *(gitops #62)*
   - [x] sleep stops api-worker *(infra #48)*
+  - [x] rollback tooling for money-job releases: `scripts/db-oneoff.sh`, runbook corrected (any migration blocks an image-only revert) *(infra #50)*; `replicas: 0` honoured *(gitops #63)*
+  - [ ] `db-oneoff.sh` first real run in prod (read-only)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
