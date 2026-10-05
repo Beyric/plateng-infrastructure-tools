@@ -34,6 +34,12 @@ aws ecr describe-images --repository-name $REPO --image-ids imageTag="$TAG" --qu
   || { echo "image $REPO:$TAG not found in ECR (or AWS session expired: aws sso login --profile $AWS_PROFILE)"; exit 1; }
 fi
 
+# The Job is rendered from the local gitops checkout: it must be main, as deployed.
+GB=$(git -C "$GITOPS" branch --show-current 2>/dev/null || true)
+if [[ "$GB" != main && "${ALLOW_BRANCH:-}" != 1 && "${PRINT:-}" != 1 ]]; then
+  echo "plateng-gitops checkout is on '${GB:-detached}', not main: the Job would be rendered from unmerged chart/values."
+  echo "  git -C $GITOPS switch main && git -C $GITOPS pull --ff-only   (or ALLOW_BRANCH=1 to override)"; exit 1
+fi
 NAME=db-oneoff-$(date -u +%Y%m%d%H%M%S)
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 P=$GITOPS/projects/weysure/environments/prod
@@ -87,7 +93,7 @@ yaml.safe_dump(job, open(path, "w"), sort_keys=False)
 PY
 
 [[ "${PRINT:-}" == 1 ]] && { cat "$WORK/job.yaml"; exit 0; }
-echo "Job $NAME in $NS  image $REPO:$TAG  identity db-migrate / Vault weysure-migrate"
+echo "Job $NAME in $NS  image $REPO:$TAG  identity db-migrate / Vault weysure-migrate  (chart from gitops ${GB:-?})"
 echo "  mode:    $MODE"
 echo "  command: $ARG"
 if [[ "${DRY:-}" == 1 ]]; then kubectl create -f "$WORK/job.yaml" --dry-run=server -o name | sed 's/$/  (server dry run: accepted, nothing created)/'; exit 0; fi
