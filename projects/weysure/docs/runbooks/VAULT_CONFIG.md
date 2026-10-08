@@ -17,7 +17,7 @@ record. Log in first: `kubectl exec -n vault -it vault-0 -- vault login -method=
 | k8s role `db-bootstrap` | SA `weysure-prod/db-bootstrap` → `db-bootstrap` |
 | policy `vault-snapshot` | read `sys/storage/raft/snapshot` - nothing else (2026-09-28) |
 | k8s role `vault-snapshot` | SA `vault/vault-snapshot` → `vault-snapshot`; ttl 15m; audience `https://kubernetes.default.svc` |
-| db config `weysure` | postgres plugin, user `vault` (password rotated, known only to Vault), allowed roles below |
+| db config `weysure` | postgres plugin, host **`weysure-postgres-v2`** (since 2026-10-08 recovery; was `weysure-postgres`), `sslmode=require`, user `vault` (password rotated, known only to Vault), allowed roles below |
 | db role `weysure-app` | `CREATE ROLE "{{name}}" … IN ROLE weysure_app`; ttl 1h, max 24h; revoke `DROP ROLE` |
 | db role `weysure-migrate` | `… IN ROLE weysure_owner; ALTER ROLE "{{name}}" SET role = 'weysure_owner'`; ttl 30m, max 1h |
 | kv `secret/platform/healthchecks` | `api_key` - read-write project key, read by `scripts/platform-sleep.sh` only (not synced into the cluster) |

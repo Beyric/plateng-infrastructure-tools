@@ -81,7 +81,7 @@ chain down, and verify the pause before acting on it.**
 | 2026-09-23 | sleep v2 (infra #34) | not run | — | would have been reverted by `root` |
 | **2026-09-29** | **sleep v3 (infra #37)** | **PASS** | **21 min** (13:54 → 14:15 UTC) | Snapshot taken first. Pause held through the 45 s proof. Spot nodes gone in 1 min, RDS stopped after 8 min, system nodes gone after 17 min (EKS drain). healthchecks paused, HTTP 200. **0 instances.** |
 | **2026-10-01** | **wake v3, first run ever** | **FAILED, recovered by hand** | 1 h 45 min from first attempt to all green (20:15 → 22:01 UTC); asleep for 2 d 6 h | Three bugs, below. Final state: 32/32 apps, both sites 200, snapshot taken. |
-| | wake v4 (this fix) | not run yet | | next wake is its rehearsal |
+| **2026-10-08** | **wake v4, first run** | **FAILED at step 1, recovered by DB restore** | ≈ 3 h to all green (≈10:00 → 13:20 UTC; API back 13:01); asleep since 2026-10-06 23:22 UTC | RDS start refused: `InsufficientDBInstanceCapacity` for db.t4g.micro (2 h of retries; a restore as t4g.micro refused in **every** AZ). Restored point-in-time as `weysure-postgres-v2`, **db.t3.micro**, us-east-1b; Vault and gitops #64 moved to it. The rest of wake v4 worked (Vault priority, secret-store wait). Also found: step 1 ignored the failed start and waited forever (fixed); `alloy` + `node-exporter` Pending on a 99 %-requested system node (cordon + move one pod). |
 
 ### What the first wake found (2026-10-01)
 | # | Symptom | Cause | Fix |
@@ -96,6 +96,21 @@ c7i-flex.2xlarge for them; the builds did not complete and must be re-run by the
 
 Observed while asleep: 0 nodes, 0 instances, RDS `stopped`, 10 volumes kept, all five paused
 Applications still paused with their policy saved in the annotation, both sites unreachable.
+
+## RDS cannot start (`InsufficientDBInstanceCapacity`)
+A stopped RDS instance keeps only its disk: starting asks AWS for a new host of that class **in that AZ**.
+When there is none, the start is refused, sometimes for hours. A stopped instance **cannot be modified**
+(AWS: "You can't modify a stopped DB instance"), so its class cannot be changed, it cannot be renamed and
+deletion protection cannot be turned off. Wake step 1 retries 20 min, then stops before changing anything.
+
+1. Retry for a while (`aws rds start-db-instance ...` every 5 min). Usually minutes; on 2026-10-08 never.
+2. Still refused: **restore a copy** with a different class (different hardware pool), any AZ of the subnet group:
+   `RESTORE_DRILL.md` -> *Real recovery -> source instance cannot start*. Point-in-time to the latest restorable
+   time; the sleep scaled the apps to 0 before stopping RDS, so nothing is missing.
+3. Cut over in this order: Vault `database/config/weysure` `connection_url` (partial update keeps the rotated
+   `vault` password; `verify_connection` proves it) -> gitops `vaultAgent.dbHost` -> terminate a stuck
+   `weysure-api` operation if Argo keeps retrying the old commit -> sync.
+4. Terraform: `state rm` the old instance, import the new one (infra #53 shows how). No `terraform apply` before.
 
 ## Vault cannot be scheduled on wake (`Insufficient cpu` + `PersistentVolume's node affinity`)
 Should not happen once Vault has its priority class. If it does: free CPU on the node in Vault's zone.
@@ -133,7 +148,8 @@ Spot reclaims are normal: 2026-10-02 the application's node was reclaimed twice 
 - **Nothing watches the platform while it is asleep**: Prometheus and Alertmanager are off, healthchecks.io is paused. Argo CD is off too: a merge to plateng-gitops is applied only at wake — do not merge what you will not be there to watch.
 - Never sleep a platform that is not healthy: Vault down, a node group update in progress or failed, or apps Degraded.
   Fix first. Sleeping hides the fault and makes the wake harder (Finding ㊺). The snapshot in step 1 fails if Vault is down.
-- AWS auto-starts a stopped RDS instance after **7 days** — and it then bills while nothing uses it. Asleep for longer than a week: wake and sleep again, or stop it again by hand (`aws rds stop-db-instance --db-instance-identifier weysure-postgres`).
+- AWS auto-starts a stopped RDS instance after **7 days** — and it then bills while nothing uses it. Asleep for longer than a week: wake and sleep again, or stop it again by hand (`aws rds stop-db-instance --db-instance-identifier weysure-postgres-v2`).
+- **Stopping RDS saves about $0.40/day and can make the platform un-wakeable** (2026-10-08). Whether sleep should stop RDS at all is an open decision; until then, expect step 1 to be the risky step.
 - Do not `terraform apply` while asleep — it sets the node group minimum back to 2 (a wake by accident).
 - Argo shows `root`, `karpenter-nodepools` and the `weysure-*` apps OutOfSync while asleep; that is the sleep state.
 - A commit to plateng-gitops while asleep is safe: the paused apps do not sync it until wake.

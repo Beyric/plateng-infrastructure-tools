@@ -15,7 +15,7 @@ export AWS_PROFILE=${AWS_PROFILE:-beyric-admin} AWS_REGION=${AWS_REGION:-us-east
 BUCKET=${BUCKET:-beyric-vault-snapshots-767397877316}
 KMS_KEY=${KMS_KEY:-05f4bdf7-0a2d-4432-827f-2509e4845e29}   # plateng-gitops platform/vault/values.yaml
 IMAGE=${IMAGE:-hashicorp/vault:1.20.4}                      # keep equal to production
-DB=${DB:-weysure-postgres}
+DB=${DB:-weysure-postgres-v2}
 CHECK_PATH=${CHECK_PATH:-secret/weysure/prod}; EXPECT_KEYS=${EXPECT_KEYS:-15}
 VAULT_USER=${VAULT_USER:-adebayo}
 NAME=vault-drill; T0=$(date +%s)
