@@ -68,9 +68,14 @@ variable "system_node_desired" {
 }
 
 variable "db_instance_class" {
-  description = "Graviton, single-AZ. Multi-AZ doubles this; revisit at the first paying-customer SLA (ADR-004)."
+  # db.t3.micro since 2026-10-08: no db.t4g.micro capacity in any of our AZs on
+  # that day (start and restore both refused). Same size and price; x86 is a
+  # different hardware pool. Single-AZ; Multi-AZ doubles the cost - revisit at
+  # the first paying-customer SLA (ADR-004). Fallback when one class has no
+  # capacity: db.t4g.small or db.t3.small (SLEEP_WAKE.md, RESTORE_DRILL.md).
+  description = "RDS instance class, single-AZ."
   type        = string
-  default     = "db.t4g.micro"
+  default     = "db.t3.micro"
 }
 
 variable "system_arm_instance_type" {

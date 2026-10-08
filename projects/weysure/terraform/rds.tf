@@ -28,7 +28,17 @@ module "rds" {
   source  = "terraform-aws-modules/rds/aws"
   version = "~> 6.10"
 
-  identifier = "${var.project}-postgres"
+  # 2026-10-08 recovery: the original instance (weysure-postgres, us-east-1a)
+  # could not be started - InsufficientDBInstanceCapacity for db.t4g.micro in
+  # every AZ. It was restored point-in-time as weysure-postgres-v2 and imported
+  # here (rds-recovery-import.tf); the old instance was removed from state only.
+  identifier = "${var.project}-postgres-v2"
+
+  # The module names these groups after `identifier` unless told otherwise.
+  # Pinned to their existing names: a rename would replace both, and the old
+  # (stopped) instance still uses them, so the destroy would fail half-way.
+  db_subnet_group_name = "${var.project}-postgres"
+  parameter_group_name = "${var.project}-postgres"
 
   engine               = "postgres"
   engine_version       = "16"
