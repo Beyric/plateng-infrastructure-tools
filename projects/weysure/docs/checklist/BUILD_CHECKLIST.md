@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-05 (Phase 10 shipped under ADR-023; developer support: KYC P2/P3 config, prelaunch, ECR expiry, api-worker + log alerts)
+> **Last reconciled:** 2026-10-08 (database recovered after a failed wake; PR 2 + PR 3 live on weysure-postgres-v2)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -273,6 +273,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] sleep stops api-worker *(infra #48)*
   - [x] rollback tooling for money-job releases: `scripts/db-oneoff.sh`, runbook corrected (any migration blocks an image-only revert) *(infra #50)*; `replicas: 0` honoured *(gitops #63)*
   - [x] `db-oneoff.sh` first real run in prod (read-only): Vault `weysure-migrate`, NetworkPolicy to RDS, Kyverno all passed; `jobs` empty, as expected *(2026-10-05 16:29 UTC)*
+- [x] Developer releases on the worker: PR 2 auto-release (Weysure-API #44, 2026-10-05) and PR 3 delivery deadline (#46, 2026-10-08) rolled out and verified; PR 3 migration tested up/down/up as a non-superuser; rollback commands in DEPLOYMENT_ROLLBACK.md
+- [x] **Database recovery 2026-10-08** — [SOP](../sop/2026-10-08-database-recovery.md)
+  - [x] wake: RDS start refused (`InsufficientDBInstanceCapacity`, db.t4g.micro, every AZ, 2 h)
+  - [x] point-in-time restore as `weysure-postgres-v2` (db.t3.micro, us-east-1b); Vault + gitops #64 cut over; API back 13:01 UTC
+  - [x] Terraform: old instance out of state, v2 imported, `No changes` *(infra #53, #55)*
+  - [x] scripts on v2; wake step 1 stops on a failed start; runbooks *(infra #54)*
+  - [ ] delete the old `weysure-postgres` with a final snapshot once it can start (auto-start 2026-10-13)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -321,6 +328,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | **Accepted for now** (Adebayo, 2026-10-05); revisit with the right-sizing work | — |
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
+| Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
+| `system-node-critical` for alloy / node-exporter | DaemonSet pods Pending on a full system node at wake (2026-10-08) | Next monitoring PR | — |
+| Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
 
 ## Resolved questions
 
