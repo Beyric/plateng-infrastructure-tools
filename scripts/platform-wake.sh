@@ -4,7 +4,7 @@
 # Runbook: projects/weysure/docs/runbooks/SLEEP_WAKE.md
 set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-beyric-admin} AWS_REGION=${AWS_REGION:-us-east-1}
-CLUSTER=beyric-prod; DB=weysure-postgres
+CLUSTER=beyric-prod; DB=${DB:-weysure-postgres-v2}   # -v2 since the 2026-10-08 recovery
 CHILD_APPS="karpenter-nodepools weysure-prod weysure-api weysure-web"
 SAVED=beyric.io/sleep-automated
 ROOT_DEFAULT='{"prune":true,"selfHeal":true}'     # plateng-gitops bootstrap/root-app.yaml
@@ -16,8 +16,23 @@ NG=$(aws eks list-nodegroups --cluster-name $CLUSTER --query 'nodegroups[0]' --o
 amtool() { kubectl exec -n monitoring "$AM" -c alertmanager -- amtool --alertmanager.url=http://127.0.0.1:9093 "$@"; }
 
 echo "[1/8] start RDS"
+# A stopped instance has no hardware: starting asks AWS for capacity again, and on
+# 2026-10-08 there was none for hours (InsufficientDBInstanceCapacity). Retry that
+# for 20 min; any other failure, or still no capacity, stops HERE - before anything
+# else is changed - instead of waiting forever in step 6.
 st=$(aws rds describe-db-instances --db-instance-identifier $DB --query 'DBInstances[0].DBInstanceStatus' --output text)
-[[ "$st" == "stopped" ]] && aws rds start-db-instance --db-instance-identifier $DB --query 'DBInstance.DBInstanceStatus' --output text || echo "  rds is '$st'"
+if [[ "$st" == "stopped" ]]; then
+  for i in $(seq 1 20); do
+    if out=$(aws rds start-db-instance --db-instance-identifier $DB --query 'DBInstance.DBInstanceStatus' --output text 2>&1); then echo "  rds: $out"; break; fi
+    if [[ "$out" == *InsufficientDBInstanceCapacity* && "$i" -lt 20 ]]; then echo "  no capacity for $DB yet (try $i/20) - retrying in 60 s"; sleep 60; continue; fi
+    echo "  could not start $DB: $(echo "$out" | tail -1 | cut -c1-200)"
+    echo "  Nothing has been changed."
+    [[ "$out" == *InsufficientDBInstanceCapacity* ]] && echo "  AWS has no capacity for this instance class: SLEEP_WAKE.md -> 'RDS cannot start'."
+    exit 1
+  done
+else
+  echo "  rds is '$st'"
+fi
 
 echo "[2/8] system node group -> 2"
 aws eks update-nodegroup-config --cluster-name $CLUSTER --nodegroup-name "$NG" --scaling-config minSize=2,maxSize=2,desiredSize=2 >/dev/null 2>&1 \

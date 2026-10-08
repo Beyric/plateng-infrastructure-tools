@@ -122,10 +122,27 @@ prints, without needing the application image.
    through that plan.
 6. Scale up, verify, keep the old instance for 7 days.
 
+Step 4 needs the old instance **running**: renaming is a modification, and a stopped instance cannot be modified.
+
+## Real recovery — source instance cannot start  *(done for real 2026-10-08)*
+The database is fine but stopped, and AWS refuses to start it (`InsufficientDBInstanceCapacity`). The old instance
+cannot be renamed, so the copy gets a **new name and endpoint**.
+
+| # | Step | 2026-10-08 |
+|---|---|---|
+| 1 | Point-in-time restore, latest restorable time, as `weysure-postgres-v2`: same subnet group, SG, parameter group; `--deletion-protection --backup-retention-period 7 --copy-tags-to-snapshot`. **No `--availability-zone`** and a **different class** if the original's has no capacity | t4g.micro refused in every AZ; **db.t3.micro** accepted, landed in us-east-1b; available after 32 min |
+| 2 | Vault: `vault write database/config/weysure connection_url='postgresql://{{username}}:{{password}}@<new-endpoint>:5432/weysure?sslmode=require'`. Partial update keeps the rotated `vault` password (tested on 1.20.4); `verify_connection` fails the write if unreachable. Then mint one credential (`-field=username`) | `Success!`, `v-userpass-weysure-…` |
+| 3 | gitops `vaultAgent.dbHost` → new endpoint; merge | gitops #64 |
+| 4 | If `weysure-api` keeps retrying the old commit's failed sync: terminate the operation (`status.operationState.phase: Terminating`), then sync | needed |
+| 5 | Verify: migration Job completes (no-op), pods 0 errors, `db-oneoff.sh … read` against the new DB, fresh Vault snapshot | all green 13:20 UTC |
+| 6 | Terraform: `state rm` old, import new (infra #53); scripts' `DB=` → new name | infra #53, this PR |
+| 7 | Old instance: delete with a final snapshot once it can start (AWS auto-starts it after 7 days) | pending |
+
 ## Drill log
 | Date | Part | Result | RPO | Duration / RTO | Notes |
 |---|---|---|---|---|---|
 | 2026-09-28 | Vault — script only, **dummy data** | PASS | — | 27 s | Mechanics proven against a throw-away Vault sealed with the same KMS key. Not a drill. |
 | 2026-09-29 | Vault — production snapshot | **PASS** | 687 min (snapshot of 02:00 UTC) | **41 s** | Run by Adebayo on the laptop. KMS decrypt, login as a production user, 15 keys. |
 | 2026-09-29 | RDS | **PASS** | **261 s** | **13 min** restore → verified; 17 min 20 s including delete | Same schema version, tables and roles as production. Drill instance deleted, no leftover backups. |
+| **2026-10-08** | **RDS — real recovery** | **PASS** | ≤ 13 min before the sleep's stop; apps were already at 0 | 32 min restore; API back **13:01 UTC**, ≈3 h after the failed wake (2 h of it waiting for capacity) | Source could not start. New name/endpoint, db.t3.micro, us-east-1b. See *Real recovery — source instance cannot start*. |
 | *next: first week of January 2027* | | | | | |

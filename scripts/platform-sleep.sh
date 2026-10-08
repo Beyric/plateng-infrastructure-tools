@@ -14,7 +14,7 @@
 # the platform to the state in git from any intermediate state.
 set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-beyric-admin} AWS_REGION=${AWS_REGION:-us-east-1}
-CLUSTER=beyric-prod; DB=weysure-postgres
+CLUSTER=beyric-prod; DB=${DB:-weysure-postgres-v2}   # -v2 since the 2026-10-08 recovery
 PAUSE_APPS="root karpenter-nodepools weysure-prod weysure-api weysure-web"   # root first - order matters
 SILENCE=${SILENCE:-12h}
 SAVED=beyric.io/sleep-automated

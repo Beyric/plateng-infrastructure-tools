@@ -9,7 +9,7 @@
 # Cost: db.t4g.micro for under an hour - a few cents.
 set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-beyric-admin} AWS_REGION=${AWS_REGION:-us-east-1}
-CLUSTER=beyric-prod; DB=weysure-postgres; TARGET="$DB-drill"; NS=weysure-prod
+CLUSTER=beyric-prod; DB=${DB:-weysure-postgres-v2}; TARGET="$DB-drill"; NS=weysure-prod
 MASTER_SECRET_ARN=${MASTER_SECRET_ARN:-"arn:aws:secretsmanager:us-east-1:767397877316:secret:rds!db-c396f13d-c4f7-4672-8d0f-4b9929190102-SIlkgw"}
 JOB="db-restore-drill-$(date -u +%Y%m%d%H%M%S)"; T0=$(date +%s)
 step() { echo; echo "[$1] $2  (+$(( ($(date +%s) - T0) / 60 ))m$(( ($(date +%s) - T0) % 60 ))s)"; }
