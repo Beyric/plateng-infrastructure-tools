@@ -82,6 +82,6 @@ protection removed. The only way out was a copy under a new name, in a class wit
 - [ ] **Delete the old instance** once it can start (≤ 2026-10-13 auto-start): compare with v2 (drill comparison),
       `--no-deletion-protection`, delete **with a final snapshot**. It is no longer in Terraform state.
 - [ ] Decide whether sleep stops RDS at all (saves ≈ $0.40/day; caused today).
-- [ ] `priorityClassName: system-node-critical` for `alloy` and `node-exporter` (DaemonSet race at wake).
+- [x] `priorityClassName: system-node-critical` for `alloy` and `node-exporter` (DaemonSet race at wake) — gitops #65, [SOP](2026-10-09-priority-classes.md).
 - [ ] Stable internal DNS name for the database (next swap = one record).
 - [ ] Watcher scripts: test their exit condition (two missed "rolled out" today).
