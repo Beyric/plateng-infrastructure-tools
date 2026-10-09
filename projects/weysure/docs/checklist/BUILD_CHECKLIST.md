@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-09 (Dojah sandbox app swapped; #65 priority classes pending; wallet-origins release next) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-09 (#65 priority classes live; Weysure-API #53 main build failed the Sonar gate, not deployed; wallet-origins to rebase onto `c4a8e1d7b3f5`) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -281,8 +281,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] scripts on v2; wake step 1 stops on a failed start; runbooks *(infra #54)*
   - [ ] delete the old `weysure-postgres` with a final snapshot once it can start (auto-start 2026-10-13)
 - [x] New Dojah sandbox app: app ID, public key, widget IDs *(gitops #66, 2026-10-09)*; API key + webhook secret in Vault, force-synced; all pods verified
-- [ ] Priority classes: alloy/node-exporter `system-node-critical`, `platform-stateful` for Prometheus/Alertmanager/Jenkins/Loki *(gitops #65 open — merge when Jenkins is idle)*
-- [ ] Developer release: wallet money origins (card-to-cash PR 2, migration `c3a8e5f1b7d2`) — reply sent/pending; pre-merge backfill count; rollback = `ORIGIN_RULES_ENFORCED=false` only
+- [x] Priority classes: alloy/node-exporter `system-node-critical`, `platform-stateful` for Prometheus/Alertmanager/Jenkins/Loki *(gitops #65, 2026-10-09; [SOP](../sop/2026-10-09-priority-classes.md))* — confirm at next wake
+- [ ] Developer release: wallet money origins (card-to-cash PR 2, migration `c3a8e5f1b7d2`, to rebase onto #53's `c4a8e1d7b3f5` with a new ID) — reply sent/pending; pre-merge backfill count; rollback = `ORIGIN_RULES_ENFORCED=false` only
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -332,7 +332,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
-| `system-node-critical` for alloy / node-exporter | DaemonSet pods Pending on a full system node at wake (2026-10-08) | Next monitoring PR | — |
+| SonarQube evictions: Karpenter consolidation / spot moves the single Sonar pod (3× on 2026-10-09; Weysure PR-38 #1 failed). Option: `karpenter.sh/do-not-disrupt` on the pod | Parked by Adebayo 2026-10-09 | Builds failing on `Failed to connect` to Sonar again | — |
+| Every branch/PR Sonar analysis writes to the one `weysure-api` / `weysure-web` project (Community, no branch params), so gate results can depend on what ran last | Not proven yet | A PR passes and main fails on the same code | — |
 | Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
 
 ## Resolved questions
