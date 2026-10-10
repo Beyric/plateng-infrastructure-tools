@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-09 late (#53/#54/#55 live; `SECRET_KEY` rotated; first superadmin bootstrapped; Sonar gate main/PR only; wallet-origins to rebase onto `c4a8e1d7b3f5`) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-10 (wallet origins live `3504876c3164`, drift 0; `WalletLotDrift` alert live, gitops #67; open: 2nd superadmin, Sonar option 2, old RDS deletion) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -288,7 +288,11 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] second superadmin invited from the console
 - [x] Sonar gate only on `main` + PRs, both Jenkinsfiles *(developers, `52d5b83`)*
   - [ ] option 2: create `weysure-api-pr` / `weysure-web-pr` (platform), then PR builds switch `projectKey` (developers)
-- [ ] Developer release: wallet money origins (card-to-cash PR 2, migration `c3a8e5f1b7d2`, to rebase onto #53's `c4a8e1d7b3f5` with a new ID) — reply sent/pending; pre-merge backfill count; rollback = `ORIGIN_RULES_ENFORCED=false` only
+- [x] Developer release: wallet money origins (card-to-cash PR 2, migration `9f1d6a2b8e47`, image `3504876c3164`, live 2026-10-09 23:52 UTC) — [SOP](../sop/2026-10-10-wallet-origins-release-and-drift-alert.md)
+  - [x] rollout verified after the fact (developers merged before "platform ready"): PreSync Succeeded, 4 pods, 0 errors
+  - [x] post-merge drift check via `db-oneoff.sh`: **0** (replaces the pre-merge count) *(2026-10-10 10:27 UTC)*
+  - [x] `WalletLotDrift` Loki alert + Docker test; `ORIGIN_RULES_ENFORCED: "false"` explicit *(gitops #67, live 10:35 UTC)*; runbook ALERTS § WalletLotDrift
+  - [ ] flag on (`ORIGIN_RULES_ENFORCED: "true"`) — after web PR 7 live; drift still 0
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -340,6 +344,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
 | SonarQube evictions: Karpenter consolidation / spot moves the single Sonar pod (3× on 2026-10-09; Weysure PR-38 #1 failed). Option: `karpenter.sh/do-not-disrupt` on the pod | Parked by Adebayo 2026-10-09 | Builds failing on `Failed to connect` to Sonar again | — |
 | Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
+| Two reconciliation schedulers per api-scheduler pod (gunicorn `--max-requests` recycles a worker ~every 2 h 45 min; each worker starts the scheduler; `WEB_CONCURRENCY=2`) | Harmless while the notification cooldown dedups | Developers move scheduled work to one process, or drift/notification noise | — |
+| No "reconciliation stopped" alert (`WalletLotDrift` is silent if the scheduler stops) | Pod-level `DeploymentReplicasMissing` covers a dead pod | Before `ORIGIN_RULES_ENFORCED` goes on | — |
 
 ## Resolved questions
 

@@ -1,6 +1,6 @@
 # Runbook — alerts
 
-Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` (Prometheus) and `loki-rules-jobs.yaml` (Loki ruler, log-based) links here. Critical → `#beyric-alerts-critical`
+Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` (Prometheus) and `loki-rules-jobs.yaml` / `loki-rules-wallet.yaml` (Loki ruler, log-based) links here. Critical → `#beyric-alerts-critical`
 (repeats every 4 h), warning → `#beyric-alerts-warning` (12 h). First move for anything red: `kubectl get app -n argocd`
 and the Grafana **Cluster overview** dashboard. Kubernetes-level alerts (KubePodCrashLooping, KubeJobFailed,
 KubeNodeNotReady, KubePersistentVolumeFillingUp) come from kube-prometheus-stack's defaults and follow the same channels.
@@ -112,6 +112,31 @@ down (**DeploymentReplicasMissing** fires too), its loop is stuck (liveness shou
 Loki (Alloy down on that node: `kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy -o wide`). While asleep
 this is expected and silenced by platform-sleep.sh.
 
+## WalletLotDrift
+From the Loki ruler (gitops `platform/monitoring/loki-rules-wallet.yaml`): a wallet reconciliation found users whose
+open origin lots (`wallet_lots.remaining`) do not add up to `wallet_balance`. Logged as `{"event": "wallet_lot_drift",
+"users": N}` by api-scheduler (every 30 min) or by api when an admin runs reconcile/repair. The value is N. Clears ~35 min
+after the last drift line. Critical: while it fires, `ORIGIN_RULES_ENFORCED` must stay `"false"`.
+
+**Never** run `repair_wallets` for this (it is ledger-only, never touches `wallet_balance` or lots) and never edit
+`wallet_lots` by hand. There is no lot-repair tool; the developers ship an audited one if drift is real.
+
+Triage (deploy artefact or bug?):
+1. Find the window: PreSync `weysure-api-db-migrate` start → last new api/worker pod Ready of the latest
+   wallet-touching rollout (Argo `weysure-api` operation history, pod `startTime`s).
+2. Run the PII-free count (quoted heredoc so `$`/`!` survive; `created_at` is naive UTC; gitops on `main`):
+   ```
+   SQL=$(cat <<'EOF'
+   WITH drift AS (SELECT u.id FROM users u LEFT JOIN (SELECT user_id, SUM(remaining) AS lots FROM wallet_lots GROUP BY user_id) l ON l.user_id = u.id WHERE COALESCE(l.lots, 0) <> CASE WHEN NULLIF(TRIM(u.wallet_balance), '') IS NULL THEN 0 WHEN TRIM(u.wallet_balance) ~ '^-?[0-9]{1,16}(\.[0-9]+)?$' THEN CAST(TRIM(u.wallet_balance) AS NUMERIC(18,2)) END),
+        w AS (SELECT DISTINCT user_id FROM wallet_transactions WHERE created_at BETWEEN 'WINDOW_START_UTC' AND 'WINDOW_END_UTC')
+   SELECT count(*) AS drifted, count(*) FILTER (WHERE d.id IN (SELECT user_id FROM w)) AS active_in_window, count(*) FILTER (WHERE d.id NOT IN (SELECT user_id FROM w)) AS no_activity_in_window FROM drift d
+   EOF
+   ) && scripts/db-oneoff.sh <api-tag> read "$SQL"
+   ```
+3. All drifted users `active_in_window` on the **first** run after a rollout → deploy artefact (old pods wrote between the
+   backfill and the new pods): tell the developers, no page. Any `no_activity_in_window`, or any drift after one clean
+   run → **bug**: page the backend owner.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -120,4 +145,4 @@ at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
 Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring get pods`; PVC full
 (`kubectl -n monitoring get pvc`); a system node roll. If **Prometheus** is down no other alert can fire — this is the
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
-log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing) cannot fire either.
+log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift) cannot fire either.
