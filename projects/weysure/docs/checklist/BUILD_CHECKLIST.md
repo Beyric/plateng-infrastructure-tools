@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-10 21:20 WAT (Weysure-API #60 withdrawal re-check live `ef17d9fe9ff2`; #61 admin identity live `f99052762224`, alembic head `b7d2e9a41c63`, post-rollout count 0; wallet origins drift 0; open: withdrawal Loki alerts, 2nd superadmin, old RDS deletion 13 Oct) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-10 21:20 WAT (Weysure-API #60 withdrawal re-check live `ef17d9fe9ff2`; #61 admin identity live `f99052762224`, alembic head `b7d2e9a41c63`, post-rollout count 0; wallet origins drift 0; withdrawal Loki alerts live (gitops #68); open: 2nd superadmin, old RDS deletion 13 Oct) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -297,7 +297,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
   - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
   - [x] startup sweep `ensure_withdrawal_rechecks`: 0 scheduled, so no automatic refund (replaces the pre-merge count)
-  - [ ] Loki alerts `WithdrawalUnresolved` (critical) / `WithdrawalRefundedByRecheck` (warning) + Docker test (5 scenarios PASS) — gitops #68 open; runbook ALERTS § WithdrawalUnresolved
+  - [x] Loki alerts `WithdrawalUnresolved` (critical) / `WithdrawalRefundedByRecheck` (warning) + Docker test (5 scenarios PASS) *(gitops #68, live 20:41 UTC: ruler inactive/ok)*; runbook ALERTS § WithdrawalUnresolved
 - [x] Developer release: admin identity API (Weysure-API #61, migration `b7d2e9a41c63`, image `f99052762224`, live 2026-10-10 20:11 UTC) — [SOP](../sop/2026-10-10-admin-identity-release.md)
   - [x] merged after "platform ready" (19:49 UTC); migration ran in PreSync, `alembic current` = `b7d2e9a41c63 (head)`, 4 pods on tag, 0 restarts, 0 errors
   - [x] post-rollout read-only count of reviews resolved on an old pod = **0** (`db-oneoff` 20:18 UTC); UPDATE not needed

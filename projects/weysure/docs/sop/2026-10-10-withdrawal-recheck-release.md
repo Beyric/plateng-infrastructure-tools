@@ -60,5 +60,5 @@ worker settle "unknown outcome" withdrawals by asking Paystack.
 
 ## Follow-ups
 
-- Loki alerts on `withdrawal_unresolved` / `withdrawal_refunded_by_recheck` after #61 is live.
+- ~~Loki alerts on the new log lines~~ done: `WithdrawalUnresolved` / `WithdrawalRefundedByRecheck` (gitops #68, live 2026-10-10 20:41 UTC).
 - Process: developers merge only after an explicit "platform ready" (HANDOFF §5 item 3).
