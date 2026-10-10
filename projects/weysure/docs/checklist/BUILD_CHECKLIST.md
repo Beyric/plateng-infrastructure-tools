@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-10 (wallet origins live `3504876c3164`, drift 0; `WalletLotDrift` alert live, gitops #67; Sonar `-pr` projects created; open: 2nd superadmin, developers' PR `projectKey` switch, old RDS deletion) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-10 21:20 WAT (Weysure-API #60 withdrawal re-check live `ef17d9fe9ff2`; #61 admin identity live `f99052762224`, alembic head `b7d2e9a41c63`, post-rollout count 0; wallet origins drift 0; open: withdrawal Loki alerts, 2nd superadmin, old RDS deletion 13 Oct) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -294,6 +294,14 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] post-merge drift check via `db-oneoff.sh`: **0** (replaces the pre-merge count) *(2026-10-10 10:27 UTC)*
   - [x] `WalletLotDrift` Loki alert + Docker test; `ORIGIN_RULES_ENFORCED: "false"` explicit *(gitops #67, live 10:35 UTC)*; runbook ALERTS § WalletLotDrift
   - [ ] flag on (`ORIGIN_RULES_ENFORCED: "true"`) — after web PR 7 live; drift still 0
+- [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
+  - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
+  - [x] startup sweep `ensure_withdrawal_rechecks`: 0 scheduled, so no automatic refund (replaces the pre-merge count)
+  - [ ] Loki alerts `WithdrawalUnresolved` (critical) / `WithdrawalRefundedByRecheck` (warning) + Docker test (5 scenarios PASS) — gitops #68 open; runbook ALERTS § WithdrawalUnresolved
+- [x] Developer release: admin identity API (Weysure-API #61, migration `b7d2e9a41c63`, image `f99052762224`, live 2026-10-10 20:11 UTC) — [SOP](../sop/2026-10-10-admin-identity-release.md)
+  - [x] merged after "platform ready" (19:49 UTC); migration ran in PreSync, `alembic current` = `b7d2e9a41c63 (head)`, 4 pods on tag, 0 restarts, 0 errors
+  - [x] post-rollout read-only count of reviews resolved on an old pod = **0** (`db-oneoff` 20:18 UTC); UPDATE not needed
+  - [x] rollback documented: downgrade with the new image, then image revert; fix-forward only after the first system audit row (accepted)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -340,6 +348,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Alert on `awscni_aws_api_error_count` | The cause has no alert; replicas-missing fires 10 min later | With the next monitoring PR | — |
 | CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
 | `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | **Accepted for now** (Adebayo, 2026-10-05); revisit with the right-sizing work | — |
+| ResourceQuota `limits.cpu=8` in `weysure-prod` leaves no surge room: during the #61 rollout (2026-10-10 20:08–20:12) api/api-worker surge pods hit `FailedCreate … exceeded quota` and the roll ran one-out-one-in (~2 min slower, briefly 1 api replica) | Rollout still completes; no errors | Right-sizing work, or before api replicas > 2 (quota headroom of one pod's limits, or `maxSurge: 0`) | — |
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
