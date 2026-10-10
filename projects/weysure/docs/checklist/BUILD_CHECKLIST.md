@@ -297,7 +297,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
   - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
   - [x] startup sweep `ensure_withdrawal_rechecks`: 0 scheduled, so no automatic refund (replaces the pre-merge count)
-  - [ ] Loki alerts `withdrawal_unresolved` (critical) / `withdrawal_refunded_by_recheck` (warning) — log lines ship in #61
+  - [ ] Loki alerts `WithdrawalUnresolved` (critical) / `WithdrawalRefundedByRecheck` (warning) + Docker test (5 scenarios PASS) — gitops #68 open; runbook ALERTS § WithdrawalUnresolved
 - [x] Developer release: admin identity API (Weysure-API #61, migration `b7d2e9a41c63`, image `f99052762224`, live 2026-10-10 20:11 UTC) — [SOP](../sop/2026-10-10-admin-identity-release.md)
   - [x] merged after "platform ready" (19:49 UTC); migration ran in PreSync, `alembic current` = `b7d2e9a41c63 (head)`, 4 pods on tag, 0 restarts, 0 errors
   - [x] post-rollout read-only count of reviews resolved on an old pod = **0** (`db-oneoff` 20:18 UTC); UPDATE not needed

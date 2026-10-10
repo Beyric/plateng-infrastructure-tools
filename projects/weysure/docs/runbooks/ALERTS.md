@@ -137,6 +137,31 @@ Triage (deploy artefact or bug?):
    backfill and the new pods): tell the developers, no page. Any `no_activity_in_window`, or any drift after one clean
    run → **bug**: page the backend owner.
 
+## WithdrawalUnresolved
+From the Loki ruler (gitops `platform/monitoring/loki-rules-withdrawals.yaml`): the worker re-checked a withdrawal with
+Paystack `WITHDRAWAL_RECHECK_ALERT_AFTER_ATTEMPTS` times (3) and still cannot tell whether the transfer was sent. Logged
+once per withdrawal as `{"event": "withdrawal_unresolved", "withdrawal_id": "..."}` by api-worker (Weysure-API #61). The
+value is the number of such withdrawals in 30 min. The user's debit is held; the worker keeps re-checking up to
+`WITHDRAWAL_RECHECK_MAX_ATTEMPTS` (10). **The alert resolves after 30 min; the withdrawal does not.**
+
+**Never** re-send the transfer from the Paystack dashboard (double payment). Match in Paystack by reference
+`wys_withdraw_<withdrawal_id>` (lowercase).
+
+Triage:
+1. Get the ids from Loki (Grafana Explore, or port-forward `svc/loki`):
+   `{namespace="weysure-prod", container=~"api|api-worker"} |= `"event": "withdrawal_unresolved"``
+2. PII-free state per id (gitops on `main`; ids are not personal data):
+   `scripts/db-oneoff.sh <api-tag> read "SELECT w.id, w.status, j.status AS job, j.attempts, j.outcome FROM withdrawals w LEFT JOIN jobs j ON j.kind = 'withdrawal.recheck' AND j.subject_id = w.id WHERE w.id IN ('<id>')"`
+3. Paystack status page down → expected; the job keeps retrying, re-check later. Otherwise hand the ids to the backend
+   owner: an admin settles it from the console (`/admin/withdrawals`), never by hand in SQL.
+
+## WithdrawalRefundedByRecheck
+Warning, from the same file: the worker refunded a withdrawal to the wallet because Paystack has no record of the
+transfer. Logged as `{"event": "withdrawal_refunded_by_recheck", "withdrawal_id": "..."}`; value = refunds in 30 min.
+Expected after a Paystack outage. The risk is a **double payment**: ask support whether any of these users was paid back
+by hand. Ids: same Loki query with `withdrawal_refunded_by_recheck`. A burst (many refunds at once) means a Paystack or
+network problem worth a look at `api-egress` and the Paystack status page.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -145,4 +170,5 @@ at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
 Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring get pods`; PVC full
 (`kubectl -n monitoring get pvc`); a system node roll. If **Prometheus** is down no other alert can fire — this is the
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
-log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift) cannot fire either.
+log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift, WithdrawalUnresolved,
+WithdrawalRefundedByRecheck) cannot fire either.
