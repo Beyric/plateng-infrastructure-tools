@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-10 (wallet origins live `3504876c3164`, drift 0; `WalletLotDrift` alert live, gitops #67; open: 2nd superadmin, Sonar option 2, old RDS deletion) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-10 (wallet origins live `3504876c3164`, drift 0; `WalletLotDrift` alert live, gitops #67; Sonar `-pr` projects created; open: 2nd superadmin, developers' PR `projectKey` switch, old RDS deletion) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -287,7 +287,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] First superadmin bootstrapped (row via `db-oneoff.sh`, link via `admin_setup_link.py` in an api pod; image `52d5b8308631`) *(2026-10-09; same SOP)*
   - [ ] second superadmin invited from the console
 - [x] Sonar gate only on `main` + PRs, both Jenkinsfiles *(developers, `52d5b83`)*
-  - [ ] option 2: create `weysure-api-pr` / `weysure-web-pr` (platform), then PR builds switch `projectKey` (developers)
+  - [x] option 2, platform: `weysure-api-pr` / `weysure-web-pr` created with main's gate, profiles, visibility, new code *(2026-10-10, `scripts/sonar-pr-projects.sh`)*
+  - [ ] option 2, developers: PR builds switch `projectKey` to `*-pr` + `sonar.projectVersion=$CHANGE_ID`; first PR build passes
 - [x] Developer release: wallet money origins (card-to-cash PR 2, migration `9f1d6a2b8e47`, image `3504876c3164`, live 2026-10-09 23:52 UTC) — [SOP](../sop/2026-10-10-wallet-origins-release-and-drift-alert.md)
   - [x] rollout verified after the fact (developers merged before "platform ready"): PreSync Succeeded, 4 pods, 0 errors
   - [x] post-merge drift check via `db-oneoff.sh`: **0** (replaces the pre-merge count) *(2026-10-10 10:27 UTC)*
