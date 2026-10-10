@@ -51,7 +51,8 @@ worker settle "unknown outcome" withdrawals by asking Paystack.
 ## Operate / roll back
 
 - **Rollback = image revert** of the promote commit (no migration). Rows written by the new code are valid for the old
-  code. Once #61 (migration `b7d2e9a41c63`) is live, an image revert is no longer possible; see #61's rollback.
+  code. Since 2026-10-10 20:11 UTC #61 (migration `b7d2e9a41c63`) is live, so an image revert to `ef17d9fe9ff2`
+  alone no longer works; see [the #61 SOP](2026-10-10-admin-identity-release.md#operate--roll-back).
 - Never re-send a transfer from the Paystack dashboard for a `needs_attention` withdrawal; match by reference
   `wys_withdraw_<withdrawal_id>` (lowercase).
 - Off switch: `JOBS_DISABLED_KINDS` is read by the worker (`jobs_stats` shows `disabled_kinds: []`), but it is **not**
