@@ -149,7 +149,9 @@ value is the number of such withdrawals in 30 min. The user's debit is held; the
 
 Triage:
 1. Get the ids from Loki (Grafana Explore, or port-forward `svc/loki`):
-   `{namespace="weysure-prod", container=~"api|api-worker"} |= `"event": "withdrawal_unresolved"``
+   ```
+   {namespace="weysure-prod", container=~"api|api-worker"} |= `"event": "withdrawal_unresolved"`
+   ```
 2. PII-free state per id (gitops on `main`; ids are not personal data):
    `scripts/db-oneoff.sh <api-tag> read "SELECT w.id, w.status, j.status AS job, j.attempts, j.outcome FROM withdrawals w LEFT JOIN jobs j ON j.kind = 'withdrawal.recheck' AND j.subject_id = w.id WHERE w.id IN ('<id>')"`
 3. Paystack status page down → expected; the job keeps retrying, re-check later. Otherwise hand the ids to the backend
