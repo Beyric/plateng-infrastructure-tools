@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-10 (wallet origins live `3504876c3164`, drift 0; `WalletLotDrift` alert live, gitops #67; Sonar `-pr` projects created; open: 2nd superadmin, developers' PR `projectKey` switch, old RDS deletion) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-10 evening (withdrawal re-check #60 live `ef17d9fe9ff2`, verified; #61 admin identity reviewed, migration `b7d2e9a41c63` pending merge; wallet origins live, drift 0; open: 2nd superadmin, old RDS deletion 13 Oct) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -294,6 +294,14 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] post-merge drift check via `db-oneoff.sh`: **0** (replaces the pre-merge count) *(2026-10-10 10:27 UTC)*
   - [x] `WalletLotDrift` Loki alert + Docker test; `ORIGIN_RULES_ENFORCED: "false"` explicit *(gitops #67, live 10:35 UTC)*; runbook ALERTS § WalletLotDrift
   - [ ] flag on (`ORIGIN_RULES_ENFORCED: "true"`) — after web PR 7 live; drift still 0
+- [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
+  - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
+  - [x] startup sweep `ensure_withdrawal_rechecks`: 0 scheduled, so no automatic refund (replaces the pre-merge count)
+  - [ ] Loki alerts `withdrawal_unresolved` (critical) / `withdrawal_refunded_by_recheck` (warning) — log lines ship in #61
+- [ ] Developer release: admin identity API (Weysure-API #61, migration `b7d2e9a41c63`) — platform review done, reply = "platform ready"
+  - [ ] merge-watch: PreSync migration Job Completed, `alembic current` = `b7d2e9a41c63`, 4 pods on tag, 0 errors
+  - [ ] post-rollout read-only count of reviews resolved on an old pod = 0 (else developers' idempotent UPDATE)
+  - [ ] note: rollback is fix-forward only after the first system audit row (downgrade refuses)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
