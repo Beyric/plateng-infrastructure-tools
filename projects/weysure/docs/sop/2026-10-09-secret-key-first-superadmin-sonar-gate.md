@@ -75,7 +75,13 @@ the link never left Adebayo's terminal.
 ## Follow-ups
 
 - [ ] Second superadmin invited from the console (Adebayo).
-- [ ] Sonar option 2: platform creates `weysure-api-pr` / `weysure-web-pr` (same gate + profiles, Jenkins token can
-  analyse); then developers switch the PR `projectKey`.
+- [x] Sonar option 2, platform half *(2026-10-10 ~11:55 UTC)*: `scripts/sonar-pr-projects.sh --apply` created
+  `weysure-api-pr` / `weysure-web-pr`, copying visibility (`public`; anonymous access is off, API returns 401), gate
+  (`Sonar way`), profiles (identical) and new code (`PREVIOUS_VERSION`, server default) from the main projects; its
+  side-by-side check matched on every row. Scan rights: no group grants on either project, so the Jenkins global analysis
+  token scans via a global/user permission, which covers new projects too. Admin token (30-day minimum) revoked after the run.
+- [ ] Sonar option 2, developer half: PR builds use `-Dsonar.projectKey=<repo>-pr` (main keeps `<repo>`), plus
+  `-Dsonar.projectVersion=$CHANGE_ID` so "new code" restarts per PR (with `PREVIOUS_VERSION` and no version it would
+  mean "everything since the first PR analysis"). Proof = first PR build passes into the `-pr` project.
 - [ ] Developer sessions on the operator's machine use the operator's EKS admin SSO role (the only human access entry),
   which is how app code ran in prod pods. Consider a separate AWS profile without EKS access for developer sessions.
