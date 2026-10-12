@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live `fd482c787ca5`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; next: #62 then web #47; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; next: web #47, then Resend switch; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -305,7 +305,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] Developer release: admin API follow-ups (Weysure-API #63, migration `c9a4e1b7d230`, image `fd482c787ca5`, live 2026-10-12 13:14 UTC) — [SOP](../sop/2026-10-12-admin-followups-release.md)
   - [x] merged after "platform ready" (12:50 UTC); migration ran in PreSync, `alembic current` = `c9a4e1b7d230 (head)`, 4 pods on tag, 0 restarts, 0 errors
   - [x] reply corrected the developers' retry claim (migration Job `backoffLimit: 0`: lock-timeout failure = manual re-sync); prod `DATABASE_URL` has no `options=`
-- [ ] Developer release: identity UX (Weysure-API #62, no migration) — after #63 verified; then web #47
+- [x] Developer release: identity UX (Weysure-API #62, no migration, image `e120fd364ce7`, live 2026-10-12 14:37 UTC) — [SOP](../sop/2026-10-12-identity-ux-release.md)
+  - [x] merged after #63 verified (14:13 UTC); rebase checked with `git range-diff` (no code change); 4 pods on tag, 0 restarts, 0 errors
+  - [ ] web #47 (identity dialog reminder, notices in the bell) — next
   - [x] `IDENTITY_RELEASE_ENABLED` **not** set in prod (Adebayo, 2026-10-12): release identity answers 403 on prelaunch
   - [ ] `EMAILS_FROM_EMAIL` → `support@weysure.com`: separate Vault change after developers confirm the SMTP account has `weysure.com` verified and an MX exists (none on 2026-10-12)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
