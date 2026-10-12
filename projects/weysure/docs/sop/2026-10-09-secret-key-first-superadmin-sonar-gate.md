@@ -39,6 +39,9 @@ Runbooks: [SECRETS_ROTATION](../runbooks/SECRETS_ROTATION.md), [DEPLOYMENT_ROLLB
 3. **Immediately** issue the link from an api pod, in a terminal nobody else can read:
    `kubectl -n weysure-prod exec -it <api-pod> -c api -- bash -c 'set -a; . "$VAULT_ENV_FILE"; set +a; exec python scripts/admin_setup_link.py "$1" <operator>' _ "$E"`
 4. Open the link, set the password, sign in; invite a second superadmin from the console.
+5. **Second superadmin (2026-10-12):** the console's *invite* form offers only Admin / Moderator, so invite as **Admin**;
+   once the invitee has set a password, **Admins → Edit → Role: Super Admin** (`PUT /admin/{id}`, superadmin-only,
+   audited `update_admin_profile`). The API would accept `role` on invite; the limit is the web form.
 
 Decisions: Sonar **option 1 now + option 2** (PR analyses into `weysure-api-pr` / `weysure-web-pr`) chosen; option 3
 (Developer Edition / community branch plugin) rejected under the scope freeze. The operator is also the recipient, so
@@ -63,6 +66,7 @@ the link never left Adebayo's terminal.
 | Final counts (query without `$`/`!`) | `admins=1, placeholder_hashes=0, breakglass_entries=1` |
 | Row (no personal data shown) | not placeholder; `gmail.com`; superadmin; active; bcrypt prefix; `updated_at 22:30:52` |
 | Sign-in | Adebayo signed in at `/admin/login` |
+| Second superadmin (2026-10-12, `db-oneoff.sh f99052762224 read`, PII-free) | `superadmin/active = 2`; audit `invite_admin = 1`, `update_admin_profile (role change) = 1`. A "both bcrypt" check was dropped: the invite's unusable password is bcrypt too, so it cannot fail |
 | Rollouts of #53/#54 (`13b3a5b3a435`), #55 (`869a9b812774`), `52d5b8308631` | all pods on tag, 0 errors, api `/api/v1/health` 200, web 200 |
 
 ## Operate / roll back
@@ -74,7 +78,7 @@ the link never left Adebayo's terminal.
 
 ## Follow-ups
 
-- [ ] Second superadmin invited from the console (Adebayo).
+- [x] Second superadmin *(2026-10-12)*: invited as Admin, promoted via Edit (step 5); verified 2 active superadmins.
 - [x] Sonar option 2, platform half *(2026-10-10 ~11:55 UTC)*: `scripts/sonar-pr-projects.sh --apply` created
   `weysure-api-pr` / `weysure-web-pr`, copying visibility (`public`; anonymous access is off, API returns 401), gate
   (`Sonar way`), profiles (identical) and new code (`PREVIOUS_VERSION`, server default) from the main projects; its
