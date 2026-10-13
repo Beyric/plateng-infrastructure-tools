@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -293,7 +293,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] rollout verified after the fact (developers merged before "platform ready"): PreSync Succeeded, 4 pods, 0 errors
   - [x] post-merge drift check via `db-oneoff.sh`: **0** (replaces the pre-merge count) *(2026-10-10 10:27 UTC)*
   - [x] `WalletLotDrift` Loki alert + Docker test; `ORIGIN_RULES_ENFORCED: "false"` explicit *(gitops #67, live 10:35 UTC)*; runbook ALERTS § WalletLotDrift
-  - [ ] flag on (`ORIGIN_RULES_ENFORCED: "true"`) — after web PR 7 live; drift still 0
+  - [x] flag on (`ORIGIN_RULES_ENFORCED: "true"`) *(gitops #72, live 2026-10-13 11:51 UTC, after web #48 `4b9e2223c440` and 24 h drift 0; developers' smoke test passed; [SOP](../sop/2026-10-13-web-7c-and-origin-rules-on.md))*
+  - [x] web #48 (7c wallet split) live 11:22 UTC; Weysure-API #65 (log PII) live 11:51 UTC, unannounced, inside the flag rollout
 - [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
   - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
   - [x] startup sweep `ensure_withdrawal_rechecks`: 0 scheduled, so no automatic refund (replaces the pre-merge count)
@@ -361,10 +362,12 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
+| SonarQube `-pr` project measures "new code" against the previous PR's analysis: same commit FAILED then PASSED (Weysure-API #64, 2026-10-13) | Community Edition: one history per project | Before relying on the gate for a security change; options: analyse `main` first in PR builds, branch plugin, or Developer Edition | — |
+| No deploy hold: developers merged Weysure-API #65 during a platform rollout (2026-10-13) | Process | Next unannounced merge | — |
 | SonarQube evictions: Karpenter consolidation / spot moves the single Sonar pod (3× on 2026-10-09; Weysure PR-38 #1 failed). Option: `karpenter.sh/do-not-disrupt` on the pod | Parked by Adebayo 2026-10-09 | Builds failing on `Failed to connect` to Sonar again | — |
 | Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
 | Two reconciliation schedulers per api-scheduler pod (gunicorn `--max-requests` recycles a worker ~every 2 h 45 min; each worker starts the scheduler; `WEB_CONCURRENCY=2`) | Harmless while the notification cooldown dedups | Developers move scheduled work to one process, or drift/notification noise | — |
-| No "reconciliation stopped" alert (`WalletLotDrift` is silent if the scheduler stops) | Pod-level `DeploymentReplicasMissing` covers a dead pod | Before `ORIGIN_RULES_ENFORCED` goes on | — |
+| No "reconciliation stopped" alert (`WalletLotDrift` is silent if the scheduler stops) — **trigger passed: flag went on 2026-10-13 without it** | Needs a positive per-run log line (asked of developers 2026-10-13) | When the per-run line ships | — |
 
 ## Resolved questions
 
