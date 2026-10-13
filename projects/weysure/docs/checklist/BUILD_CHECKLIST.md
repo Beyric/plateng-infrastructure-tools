@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -127,7 +127,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Traefik via Helm, behind an NLB
 - [x] **NLB security group restricted to Cloudflare published IP ranges** — built late: was `0.0.0.0/0` until 2026-10-13 00:24 UTC *(gitops #69; [SOP](../sop/2026-10-13-nlb-cloudflare-only-and-old-rds-deleted.md))*
   - [x] Traefik entrypoints reachable only from the NLB subnets (NetworkPolicy `traefik-ingress-from-nlb`, gitops #71, live 2026-10-13 12:19 UTC; pod test 301 → 000)
-- [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
+- [x] Real client IP honoured: the API reads `CF-Connecting-IP` from trusted peers only (Weysure-API #66, `TRUSTED_PROXY_CIDRS` in gitops #72), verified 2026-10-13 14:34 UTC: audit row `public-ipv4`, 0 `10.x` *(429 redaction not yet observed)*
 - [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
 - [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
 - [ ] external-dns with the **Cloudflare provider**
