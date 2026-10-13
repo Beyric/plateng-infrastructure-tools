@@ -65,6 +65,35 @@ Revert gitops #69. The controller restores `0.0.0.0/0` at the next reconcile (~s
 - Cloudflare changes its ranges rarely; if it does, update **both** lists in `traefik.yaml`.
 - A new public host must be Cloudflare-proxied (orange cloud). A grey-cloud host pointing at the NLB will time out by design.
 
+## 1b. Only the NLB may reach Traefik (gitops [#71](https://github.com/Beyric/plateng-gitops/pull/71), live 2026-10-13 12:19 UTC)
+
+**Why:** Weysure-API #66 trusts `CF-Connecting-IP` from any peer in `10.0.0.0/16`, and that peer is always Traefik. The
+`traefik` namespace had no NetworkPolicy, so any pod (Jenkins agents running PR code included; `jenkins` has none either)
+could call Traefik directly with a forged header and choose its rate-limit bucket and audit IP. Raised by the developers
+(`weysure/docs/platform-note-2026-10-13-client-ip.md`, ask 2). Traefik cannot strip the header only for some sources, so
+the control is who can connect.
+
+**What:** NetworkPolicy `traefik-ingress-from-nlb` via the chart's `extraObjects` in `bootstrap/apps/traefik.yaml`:
+8000/8443/8080 only from `10.0.1.0/24` and `10.0.2.0/24` (public subnets with the NLB's ENIs; client IP preservation is off,
+so the NLB is the source; 0 pods have addresses there), 9100 from `monitoring`. Kubelet probes are allowed by the VPC CNI agent.
+
+**Verification:**
+
+| Check | Before | After |
+|---|---|---|
+| Throwaway pod in `default` → `http://traefik.traefik.svc/` | `301` (12:14 UTC, before Argo synced) | `000`, time-out (12:24 UTC) |
+| NLB targets (4) | healthy | healthy at every 30 s check for 3 min |
+| Sites | 200 | 200 |
+| Prometheus `up{namespace="traefik"}` | 1, 1 | 1, 1 |
+
+**Lesson:** "merged" is not "live": the first negative test ran 11 s after the merge, before Argo had polled; check the
+object exists before testing its effect.
+
+**Roll back:** revert gitops #71. **Risk if wrong:** NLB health checks fail and every host goes dark; watch target health.
+
+**Still open:** pods in `monitoring` can reach the API on 8000 directly (`allow-monitoring-ingress`), so they could send their
+own `CF-Connecting-IP`; accepted (our own pods). `jenkins` namespace has no NetworkPolicy at all (separate follow-up).
+
 ## 2. Old `weysure-postgres` deleted
 
 | | |
