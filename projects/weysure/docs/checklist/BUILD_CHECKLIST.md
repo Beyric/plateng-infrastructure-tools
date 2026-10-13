@@ -126,6 +126,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Cloudflare API token (scoped: Zone.DNS edit only) read **from Vault** via ExternalSecret — no hand-created Secret
 - [ ] Traefik via Helm, behind an NLB
 - [x] **NLB security group restricted to Cloudflare published IP ranges** — built late: was `0.0.0.0/0` until 2026-10-13 00:24 UTC *(gitops #69; [SOP](../sop/2026-10-13-nlb-cloudflare-only-and-old-rds-deleted.md))*
+  - [x] Traefik entrypoints reachable only from the NLB subnets (NetworkPolicy `traefik-ingress-from-nlb`, gitops #71, live 2026-10-13 12:19 UTC; pod test 301 → 000)
 - [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
 - [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
 - [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
@@ -363,6 +364,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
 | SonarQube `-pr` project measures "new code" against the previous PR's analysis: same commit FAILED then PASSED (Weysure-API #64, 2026-10-13) | Community Edition: one history per project | Before relying on the gate for a security change; options: analyse `main` first in PR builds, branch plugin, or Developer Edition | — |
+| `jenkins` namespace has no NetworkPolicy: agents run developers' PR code with open egress/ingress inside the cluster | Not yet designed (agents need GitHub, ECR, Sonar, the API server) | Before any secret reaches PR builds | — |
 | No deploy hold: developers merged Weysure-API #65 during a platform rollout (2026-10-13) | Process | Next unannounced merge | — |
 | SonarQube evictions: Karpenter consolidation / spot moves the single Sonar pod (3× on 2026-10-09; Weysure PR-38 #1 failed). Option: `karpenter.sh/do-not-disrupt` on the pod | Parked by Adebayo 2026-10-09 | Builds failing on `Failed to connect` to Sonar again | — |
 | Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
