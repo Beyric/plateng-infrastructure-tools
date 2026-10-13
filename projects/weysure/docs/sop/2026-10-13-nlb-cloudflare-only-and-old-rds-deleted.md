@@ -94,6 +94,30 @@ object exists before testing its effect.
 **Still open:** pods in `monitoring` can reach the API on 8000 directly (`allow-monitoring-ingress`), so they could send their
 own `CF-Connecting-IP`; accepted (our own pods). `jenkins` namespace has no NetworkPolicy at all (separate follow-up).
 
+## 1c. The API stores the real client IP (Weysure-API #66, live 2026-10-13 13:47 UTC, `e2230c950953`)
+
+**What:** `app/core/client_ip.py` reads `CF-Connecting-IP` only when the socket peer is inside `TRUSTED_PROXY_CIDRS`; rate-limit
+keys and the six `ip_address` writers use it; `X-Forwarded-For` is never read. `TRUSTED_PROXY_CIDRS` defaults to `[]` in code
+(fixes Sonar `python:S1313`, fail-safe) and is set to `10.0.0.0/16` in our ConfigMap (gitops #72). No migration.
+
+**The three layers it rests on:** NLB admits only Cloudflare (#69) → Traefik admits only the NLB (#71) → app trusts the header
+only from the configured CIDR (#66 + #72). Each blocks a different forgery path (internet, in-cluster pod, missing setting).
+
+**Verification:**
+
+| Check | Result |
+|---|---|
+| Gate | PR-66 #2 PASSED on `35dd0b3` (13:08 UTC); default `[]` confirmed in the diff |
+| Rollout | promote 13:41:18 UTC; api ×2 (two nodes), scheduler, worker on `e2230c950953`, 0 restarts; 0 errors, 0 config errors |
+| Direct NLB | `000` |
+| First developer call 14:25:28 | 403, **30 bytes**, 0.8 ms = `HTTPBearer` "Not authenticated" (no token): handler never ran, no row. Not a test |
+| Second call 14:34:26 | 403, **70 bytes**, 17 ms + `[SECURITY_AUDIT] Blocked select-role attempt after onboarding` |
+| DB (`db-oneoff` read, kinds only, no addresses) | `security_audit_logs` since 13:41: **1 × `public-ipv4`** at 14:34:26.27, **0 × `vpc-10.x`** |
+
+**Not yet verified:** the 429 log line shows `(redacted)` (no rate-limit hit since deploy).
+
+**Roll back:** image revert to `9df8ce6624d7` (no migration); rate limits return to one bucket per Traefik pod.
+
 ## 2. Old `weysure-postgres` deleted
 
 | | |
