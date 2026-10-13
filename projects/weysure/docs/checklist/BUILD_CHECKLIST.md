@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -310,10 +310,11 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] web #47 (identity dialog reminder, notices in the bell): merged 15:05 UTC, promoted `0456c8424250` 15:14, both web pods on tag, sites 200, 32/32 Argo healthy *(2026-10-12; frontend only, no platform change)*
   - [x] `IDENTITY_RELEASE_ENABLED` **not** set in prod (Adebayo, 2026-10-12): release identity answers 403 on prelaunch
   - [x] API email moved to **Resend**, From `support@weysure.com` (Vault v11, 2026-10-12 14:27 UTC; test reset DKIM/SPF pass) — [SOP](../sop/2026-10-12-resend-email-switch.md). Applied ahead of web #47 (process note in SOP)
+- [x] api/web replicas never share a node: hostname spread `DoNotSchedule` for api and web *(gitops #70, live 2026-10-13 08:37 UTC; ADR-024; [SOP](../sop/2026-10-13-api-web-hard-spread.md))*: api and web each on 2 nodes, 0 Pending, sites 200
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
-- **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays).
+- **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays). **Reversed 2026-10-13 for api/web (ADR-024).**
 - [x] 10 · SOP [2026-09-29-phase-10-hardening-dr](../sop/2026-09-29-phase-10-hardening-dr.md) · overview · checklist *(2026-09-30; wake + verifier attach stay open above)* · ADR-023 scope freeze
 
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
@@ -357,7 +358,6 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
 | `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | **Accepted for now** (Adebayo, 2026-10-05); revisit with the right-sizing work | — |
 | ResourceQuota `limits.cpu=8` in `weysure-prod` leaves no surge room (**seen twice**: #63 rollout 2026-10-12 13:13, api-worker): during the #61 rollout (2026-10-10 20:08–20:12) api/api-worker surge pods hit `FailedCreate … exceeded quota` and the roll ran one-out-one-in (~2 min slower, briefly 1 api replica) | Rollout still completes; no errors | Right-sizing work, or before api replicas > 2 (quota headroom of one pod's limits, or `maxSurge: 0`) | — |
-| All api pods and both web replicas can land on one spot node (seen 2026-10-12 after the 12:43 spot interruption: everything on `ip-10-0-3-32`); one more interruption = ~1–2 min full outage | Accepted 09-29 (replicas may share a spot node), practice platform | With right-sizing, or before launch: `topologySpreadConstraints` (hostname, `ScheduleAnyway`) in `charts/beyric-app` | — |
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |
