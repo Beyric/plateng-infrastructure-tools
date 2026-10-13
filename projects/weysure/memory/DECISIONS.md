@@ -634,3 +634,16 @@ platform. The platform sleeps between sessions; a destroy date is Adebayo's deci
 **Consequences.** The build checklist is honest about what is not proven (wake, verifier with a
 real token). Interview answers must say "designed for" where nothing was measured. Reviving the
 platform for real users starts from the deferred list, larger subnets first.
+
+## ADR-024 — api and web replicas must run on different nodes (amends ADR-023)
+
+**Date:** 2026-10-13 · **Status:** Accepted
+
+**Context.** ADR-023 let api and web replicas share a spot node. On 2026-10-12 and 2026-10-13 every replica of both sat on
+one spot node, so a single spot interruption would take both sites down. Developers and testers now use the platform daily.
+
+**Decision.** Hostname topology spread `DoNotSchedule` for `api` and `web` (gitops #70); single-replica components keep
+`ScheduleAnyway`. No zone spread: workload nodes and RDS share us-east-1b.
+
+**Consequences.** At least two workload nodes are always needed (true today; otherwise Karpenter adds one small spot node).
+A spot shortage leaves the second replica Pending while the old pod serves. Every chart template change restarts all pods.
