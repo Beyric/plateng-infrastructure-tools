@@ -70,6 +70,6 @@ Raised in `platform-reply-2026-10-13-origin-rules-on.md`. Structural fix (deploy
   line to alert on its absence; asked the developers for `wallet reconciliation: N users, 0 mismatches` per run.
 - Double reconciliation scheduler (one per gunicorn worker, `WEB_CONCURRENCY=2`): raised again with the developers.
 - SonarQube `-pr` project: "new code" is measured against the previous PR's analysis, so the same commit can fail then pass
-  (Weysure-API #64: PR-64 #1 FAILED, #2 PASSED on `5a92c33`; the S7504-style `list()` issue stayed open). Read the issues, not
+  (Weysure-API #64: PR-64 #1 FAILED, #2 PASSED on `5a92c33`; the "unnecessary `list()`" issue at `app/services/wallet_origins.py:167` stayed open). Read the issues, not
   the gate colour, until each PR is compared with `main`.
 - Deploy hold during platform rollouts (developers merged #65 mid-change).
