@@ -68,7 +68,7 @@ The pre-merge backfill count could no longer be run; the post-merge drift query 
 
 - **Alert fires:** follow [ALERTS § WalletLotDrift](../runbooks/ALERTS.md#walletlotdrift). Never `repair_wallets`, never
   edit `wallet_lots`.
-- **Switch enforcement on** (later): web PR 7 live + drift 0 → set `ORIGIN_RULES_ENFORCED: "true"` in gitops api values.
+- **Switch enforcement on** (later): web PR 7 live + drift 0 → set `ORIGIN_RULES_ENFORCED: "true"` in gitops api values. **Done 2026-10-13 11:51 UTC (gitops #72): see [SOP](2026-10-13-web-7c-and-origin-rules-on.md).**
   Roll back by setting it to `"false"` again.
 - **Remove the alert:** revert gitops #67 (the env value equals the code default, so behaviour does not change).
 
