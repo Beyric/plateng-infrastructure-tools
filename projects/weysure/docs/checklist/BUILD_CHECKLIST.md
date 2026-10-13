@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -125,7 +125,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] **Cloudflare zone for `beyrictech.com`**; delegate nameservers from Namecheap *(ADR-011)*
 - [ ] Cloudflare API token (scoped: Zone.DNS edit only) read **from Vault** via ExternalSecret — no hand-created Secret
 - [ ] Traefik via Helm, behind an NLB
-- [ ] **NLB security group restricted to Cloudflare published IP ranges**
+- [x] **NLB security group restricted to Cloudflare published IP ranges** — built late: was `0.0.0.0/0` until 2026-10-13 00:24 UTC *(gitops #69; [SOP](../sop/2026-10-13-nlb-cloudflare-only-and-old-rds-deleted.md))*
 - [ ] Traefik configured to honour `CF-Connecting-IP` (else rate limiting sees one address)
 - [ ] cert-manager + `ClusterIssuer` — Let's Encrypt, **DNS-01 via Cloudflare**
 - [ ] **Staging issuer first** — Let's Encrypt production has hard rate limits
@@ -279,7 +279,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] point-in-time restore as `weysure-postgres-v2` (db.t3.micro, us-east-1b); Vault + gitops #64 cut over; API back 13:01 UTC
   - [x] Terraform: old instance out of state, v2 imported, `No changes` *(infra #53, #55)*
   - [x] scripts on v2; wake step 1 stops on a failed start; runbooks *(infra #54)*
-  - [ ] delete the old `weysure-postgres` with a final snapshot once it can start (auto-start 2026-10-13)
+  - [x] old `weysure-postgres` deleted 2026-10-13; final snapshot `weysure-postgres-final-2026-10-13` available *([SOP](../sop/2026-10-13-nlb-cloudflare-only-and-old-rds-deleted.md))*
 - [x] New Dojah sandbox app: app ID, public key, widget IDs *(gitops #66, 2026-10-09)*; API key + webhook secret in Vault, force-synced; all pods verified
 - [x] Priority classes: alloy/node-exporter `system-node-critical`, `platform-stateful` for Prometheus/Alertmanager/Jenkins/Loki *(gitops #65, 2026-10-09; [SOP](../sop/2026-10-09-priority-classes.md))* — confirm at next wake
 - [x] Developer releases Weysure-API #53 (session revocation, migration `c4a8e1d7b3f5`), #54 (Sonar fix), #55 (double payout, no migration) *(live 2026-10-09: `13b3a5b3a435`, `869a9b812774`)*
