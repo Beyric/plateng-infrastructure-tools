@@ -339,16 +339,20 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Backlog — identified, not yet scheduled
 
+- [x] **Wallet reconciliation as one worker job** — Weysure-API #68 live 2026-10-15 19:07 UTC (`7249abff973c`); gitops #76 (worker flags + `WalletLotDrift` reads api-worker), #77 (`WalletReconciliationMissing`) *([SOP](../sop/2026-10-15-recon-loop-worker-job.md))*
+  - [ ] Scale `api-scheduler` to 0 (~2026-10-18), then remove it
+
 - [ ] 🔵 **Domain cutover to `weysure.com` / `api.weysure.com`** (tools stay on beyrictech.com) — *[plan](../plans/2026-10-15-domain-cutover-weysure-com.md)*
   - [x] Read-only checks (DNS, mail, CAA, origin, chart, settings) — 2026-10-15
   - [x] Dashboard checks §2: parking records replaced, Full (strict), token covers weysure.com, no rules to mirror, no mobile app
   - [x] Phase A: DNS, chart `extraHosts` (gitops #75), staging cert proof, both hosts served — 2026-10-15
-  - [ ] Phase A5: `www` → apex 301 (Cloudflare rule)
+  - [x] Phase A5: `www` → apex 301 (Cloudflare rule) — verified 2026-10-15 (path and query kept)
   - [ ] Phase B: API settings, web rebuild, Paystack/Dojah URLs, probes
   - [ ] Phase C: old web host 301; old API host retired after a 14-day soak
 
 - [x] **Paystack webhook-key trust** — Weysure-API #69 live 2026-10-15 14:13 UTC (`28e48768d0cd`); Vault LIVE placeholder emptied; look-back clean; test top-up verified *([SOP](../sop/2026-10-15-paystack-webhook-key-trust.md))*
-  - [ ] Loki alerts `PaystackWebhook*` — gitops #74 (tested; awaiting merge)
+  - [x] Loki alerts `PaystackWebhook*` — gitops #74 merged; ruler loaded, 3 rules ok
+  - [x] Test key rolled 2026-10-15 ~16:35 UTC (no `sk_test_a3e6` match; rolled anyway): SECRET new `sk_test_`, TEST empty; api/worker/scheduler reloaded 16:39–16:45 UTC
   - [ ] **Launch gate:** `PAYSTACK_SECRET_KEY` = `sk_live_`; TEST empty or prod's own key; no `[CONFIG] Paystack` warning
 
 - [x] ~~CloudFront distributions~~ — superseded by Cloudflare free edge *(ADR-011)*
