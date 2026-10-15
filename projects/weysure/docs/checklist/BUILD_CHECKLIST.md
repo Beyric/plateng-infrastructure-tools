@@ -339,6 +339,14 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Backlog — identified, not yet scheduled
 
+- [ ] 🔵 **Domain cutover to `weysure.com` / `api.weysure.com`** (tools stay on beyrictech.com) — *[plan](../plans/2026-10-15-domain-cutover-weysure-com.md)*
+  - [x] Read-only checks (DNS, mail, CAA, origin, chart, settings) — 2026-10-15
+  - [x] Dashboard checks §2: parking records replaced, Full (strict), token covers weysure.com, no rules to mirror, no mobile app
+  - [x] Phase A: DNS, chart `extraHosts` (gitops #75), staging cert proof, both hosts served — 2026-10-15
+  - [ ] Phase A5: `www` → apex 301 (Cloudflare rule)
+  - [ ] Phase B: API settings, web rebuild, Paystack/Dojah URLs, probes
+  - [ ] Phase C: old web host 301; old API host retired after a 14-day soak
+
 - [x] **Paystack webhook-key trust** — Weysure-API #69 live 2026-10-15 14:13 UTC (`28e48768d0cd`); Vault LIVE placeholder emptied; look-back clean; test top-up verified *([SOP](../sop/2026-10-15-paystack-webhook-key-trust.md))*
   - [ ] Loki alerts `PaystackWebhook*` — gitops #74 (tested; awaiting merge)
   - [ ] **Launch gate:** `PAYSTACK_SECRET_KEY` = `sk_live_`; TEST empty or prod's own key; no `[CONFIG] Paystack` warning
