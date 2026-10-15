@@ -115,7 +115,8 @@ this is expected and silenced by platform-sleep.sh.
 ## WalletLotDrift
 From the Loki ruler (gitops `platform/monitoring/loki-rules-wallet.yaml`): a wallet reconciliation found users whose
 open origin lots (`wallet_lots.remaining`) do not add up to `wallet_balance`. Logged as `{"event": "wallet_lot_drift",
-"users": N}` by api-scheduler (every 30 min) or by api when an admin runs reconcile/repair. The value is N. Clears ~35 min
+"users": N}` by api-worker (every 30 min, job `wallet.reconciliation`, since Weysure-API #68; api-scheduler before) or by
+api when an admin runs reconcile/repair. The value is N. Clears ~35 min
 after the last drift line. Critical: while it fires, `ORIGIN_RULES_ENFORCED` must stay `"false"`.
 
 **Never** run `repair_wallets` for this (it is ledger-only, never touches `wallet_balance` or lots) and never edit
@@ -197,6 +198,22 @@ outcome before money moves; when Paystack cannot be asked (network, 5xx, 429) it
 Nothing is lost, credits are delayed. Check the Paystack status page and `api-egress` (NetworkPolicy, NAT); the API logs
 `could not verify ref=... with Paystack (<ExceptionType>)` with the cause class.
 
+## WalletReconciliationMissing
+Warning, from the Loki ruler (gitops `platform/monitoring/loki-rules-wallet.yaml`): `api-worker` has not logged
+`wallet reconciliation: N users, M mismatches` for 75 min. Since Weysure-API #68 the check is one recurring job
+(`wallet.reconciliation`) that runs every 30 min on the worker. **While this fires, WalletLotDrift cannot fire either.**
+
+Triage:
+1. Worker up? If `JobsStatsMissing` also fires, fix the worker first.
+2. Flag: `kubectl -n weysure-prod get cm api-worker-config -o jsonpath='{.data.WALLET_RECONCILIATION_SCHEDULER_ENABLED}'`
+   must be `true` (gitops `apps/api/values.yaml`, `api-worker.env`). A last line `wallet reconciliation: disabled by ...`
+   means it was switched off; the chain ended.
+3. Job row (counts only): `scripts/db-oneoff.sh <api-tag> read "SELECT status, count(*), min(run_at) FROM jobs WHERE kind = 'wallet.reconciliation' GROUP BY status"`.
+   Healthy = exactly one `pending` row with `run_at` no more than 30 min ahead. None → restart `api-worker` (the startup
+   sweep seeds it when the flag is on). `dead` or `cancelled` only → hand it to the developers (jobs SOP).
+4. Repeated `wallet reconciliation failed:` lines (ERROR with traceback): the run fails and requeues. Hand the traceback
+   to the backend owner.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -207,4 +224,4 @@ Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring ge
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
 log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift, WithdrawalUnresolved,
 WithdrawalRefundedByRecheck, PaystackWebhookKeyMismatch, PaystackWebhookSignatureFailing,
-PaystackWebhookVerifyUnavailable) cannot fire either.
+PaystackWebhookVerifyUnavailable, WalletReconciliationMissing) cannot fire either.
