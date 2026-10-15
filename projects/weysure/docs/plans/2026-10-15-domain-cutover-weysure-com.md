@@ -67,6 +67,11 @@ deleted · A5 ⏳ `www` → apex 301 rule (Adebayo).
 | B3 | Adebayo | Paystack and Dojah webhook and callback URLs → `api.weysure.com` | One test-mode top-up end to end (as on 10-15); Loki shows the webhook on the new host |
 | B4 | platform | Blackbox probes / `SiteDown*` targets → new hosts (keep the old ones until §5) | Probes green |
 
+**Phase B status (2026-10-15 21:20 WAT):** B1 ✅ gitops #78 (also fixed a phase A gap: CORS rejected `https://weysure.com`,
+400, so the app failed from the new host; now 200 from both origins, foreign origin still 400) · B4 ✅ probes for
+`api.weysure.com` and `weysure.com` up · B2 ⏳ developers' `Jenkinsfile` PR (ask sent after web #49 went live) · B3 ⏳
+Paystack and Dojah URLs (Adebayo, after B2).
+
 ## 5. Phase C — retire the old hosts
 
 | Step | When | Change |
