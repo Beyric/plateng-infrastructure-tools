@@ -342,14 +342,15 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] **Wallet reconciliation as one worker job** — Weysure-API #68 live 2026-10-15 19:07 UTC (`7249abff973c`); gitops #76 (worker flags + `WalletLotDrift` reads api-worker), #77 (`WalletReconciliationMissing`) *([SOP](../sop/2026-10-15-recon-loop-worker-job.md))*
   - [ ] Scale `api-scheduler` to 0 (~2026-10-18), then remove it
 
-- [ ] 🔵 **Domain cutover to `weysure.com` / `api.weysure.com`** (tools stay on beyrictech.com) — *[plan](../plans/2026-10-15-domain-cutover-weysure-com.md)*
+- [ ] 🔵 **Domain cutover to `weysure.com` / `api.weysure.com`** (live on the new hosts 2026-10-15; soak until ≈10-29) (tools stay on beyrictech.com) — *[plan](../plans/2026-10-15-domain-cutover-weysure-com.md)*
   - [x] Read-only checks (DNS, mail, CAA, origin, chart, settings) — 2026-10-15
   - [x] Dashboard checks §2: parking records replaced, Full (strict), token covers weysure.com, no rules to mirror, no mobile app
   - [x] Phase A: DNS, chart `extraHosts` (gitops #75), staging cert proof, both hosts served — 2026-10-15
   - [x] Phase A5: `www` → apex 301 (Cloudflare rule) — verified 2026-10-15 (path and query kept)
   - [x] Phase B1+B4: API settings, CORS for both origins, probes — gitops #78, 2026-10-15
-  - [ ] Phase B2: web `Jenkinsfile` → `api.weysure.com` (developers) · B3: Paystack/Dojah URLs (Adebayo)
-  - [ ] Phase C: old web host 301; old API host retired after a 14-day soak
+  - [x] Phase B2: web #51 live (`a0d4e7b4adfe`) · B3: Paystack/Dojah URLs → `api.weysure.com` · ₦500 test top-up end to end — 2026-10-15
+  - [x] Phase C1: `weysure.beyrictech.com` → `weysure.com` 301 — 2026-10-15
+  - [ ] Phase C2/C3 (≈ 2026-10-29): retire `weysure-api.beyrictech.com` after 14 days without traffic; CORS → only `weysure.com`; drop old names from `extraHosts`/probes/docs
 
 - [x] **Paystack webhook-key trust** — Weysure-API #69 live 2026-10-15 14:13 UTC (`28e48768d0cd`); Vault LIVE placeholder emptied; look-back clean; test top-up verified *([SOP](../sop/2026-10-15-paystack-webhook-key-trust.md))*
   - [x] Loki alerts `PaystackWebhook*` — gitops #74 merged; ruler loaded, 3 rules ok

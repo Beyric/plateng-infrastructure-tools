@@ -72,6 +72,14 @@ deleted · A5 ⏳ `www` → apex 301 rule (Adebayo).
 `api.weysure.com` and `weysure.com` up · B2 ⏳ developers' `Jenkinsfile` PR (ask sent after web #49 went live) · B3 ⏳
 Paystack and Dojah URLs (Adebayo, after B2).
 
+**Phase B/C1 status (2026-10-15 22:45 WAT):** B2 ✅ web #51 merged 21:09:00 UTC (`a0d4e7b` = approved `1b92fdb`), live
+21:23 UTC as `a0d4e7b4adfe`; the bundle names `api.weysure.com` (2 chunks) and the old API host nowhere · C1 ✅ Cloudflare
+(`beyrictech.com` zone) 301 `weysure.beyrictech.com/*` → `https://weysure.com/$1`, path and query kept; old API host
+still 200 · B3 ✅ Paystack and Dojah URLs → `api.weysure.com` (Adebayo) · **End to end:** ₦500 test top-up on
+`weysure.com` 21:37 UTC: webhook signature valid with `key class: wallet` (the rotated key alone), one `TOPUP COMPLETED`
+row · Open: developers' WebSocket 101 report; C2/C3 after a 14-day soak (≈ 2026-10-29) with no traffic on
+`weysure-api.beyrictech.com`.
+
 ## 5. Phase C — retire the old hosts
 
 | Step | When | Change |
