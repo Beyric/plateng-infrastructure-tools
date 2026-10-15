@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-15 13:40 WAT (refund to source #67 live, flag off, alembic head `d4b7f2a91c68`; open: Paystack webhook-key fix API #69) · earlier: 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -297,6 +297,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] flag on (`ORIGIN_RULES_ENFORCED: "true"`) *(gitops #72, live 2026-10-13 11:51 UTC, after web #48 `4b9e2223c440` and 24 h drift 0; developers' smoke test passed; [SOP](../sop/2026-10-13-web-7c-and-origin-rules-on.md))*
   - [x] web #48 (7c wallet split) live 11:22 UTC; Weysure-API #65 (log PII) live 11:51 UTC, unannounced, inside the flag rollout
 - [x] Developer release: risk holds (Weysure-API #64, migration `58f3a1c7e0b9`, image `f9cf2e8d6a3f`, live 2026-10-13 15:54 UTC, all flags off) — [SOP](../sop/2026-10-13-risk-holds-release.md)
+- [x] Developer release: refund to source (Weysure-API #67, migration `d4b7f2a91c68`, image `acdae7fd271c`, live 2026-10-13 23:38 UTC, flag off) — [SOP](../sop/2026-10-14-refund-to-source-release.md)
+  - [ ] Loki alerts `source_refund_orphan`/`_conflict` (page), `_unresolved`/`_stale`/`_over_taken` (ticket) — before the flag
+  - [ ] developers' test-mode `refund.*` capture received — before the flag
+  - [ ] `REFUND_TO_SOURCE_ENABLED=true` (gitops `commonEnv`)
   - [ ] stage 1 capture (Vault `RISK_SIGNAL_HASH_KEY`, privacy clause, web credentials change) · [ ] stage 2 shadow (Loki alerts first) · [ ] IP signal · [ ] enforce
 - [x] Developer release: withdrawal re-check (Weysure-API #60, no migration, image `ef17d9fe9ff2`, live 2026-10-10 15:22 UTC) — [SOP](../sop/2026-10-10-withdrawal-recheck-release.md)
   - [x] rollout verified after the fact (merged before "platform ready"): 4 pods on tag, 0 restarts, 0 errors, 0 dead jobs
