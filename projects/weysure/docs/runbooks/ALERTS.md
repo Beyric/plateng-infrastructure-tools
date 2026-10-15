@@ -164,6 +164,39 @@ Expected after a Paystack outage. The risk is a **double payment**: ask support 
 by hand. Ids: same Loki query with `withdrawal_refunded_by_recheck`. A burst (many refunds at once) means a Paystack or
 network problem worth a look at `api-egress` and the Paystack status page.
 
+## PaystackWebhookKeyMismatch
+Critical, from the Loki ruler (gitops `platform/monitoring/loki-rules-paystack.yaml`): a Paystack webhook carried a
+**valid** signature from a key class that may not speak for that flow, and was refused (Weysure-API #69). Logged by api as
+`paystack webhook: signature/mode mismatch event=... flow=... signed_by=...`; the API also raises one admin notification
+per hour (`paystack_webhook_mismatch`). No money moved. Value = refusals in 30 min.
+
+Two causes: someone holds a leaked key (the test key lives in developer `.env` and CI) and is forging events, or a key is
+misconfigured (for example a live body signed by a test key after a half-done key change).
+
+Triage:
+1. Loki: `` {namespace="weysure-prod", container="api"} |= `paystack webhook: signature/mode mismatch` `` — note `event`,
+   `flow` and `signed_by`. Never paste request bodies or keys anywhere.
+2. Key shape (no values): `bash scripts/paystack-key-shape.sh` (needs `vault login` inside `vault-0`).
+3. `signed_by=developer_test` on `wallet_*` or `escrow_production` with keys that look right → treat as forgery: rotate
+   the leaked key in the Paystack dashboard, update Vault `secret/weysure/prod` in the same step, restart api, tell the
+   developers. Pre-launch, `PAYSTACK_SECRET_KEY` equals the test key, so test-key bodies count as the wallet key and do
+   not show here: this alert matters most after go-live.
+
+## PaystackWebhookSignatureFailing
+Warning, same file: ≥3 webhooks in 30 min matched **no** configured key (`[PAYSTACK WEBHOOK] Signature verification failed`).
+They are answered 200 and dropped, so **Paystack does not redeliver them**. Value = failures in 30 min.
+
+Usually junk traffic. The case that matters: prod holds a key Paystack no longer uses (rolled in the dashboard, Vault not
+updated) — then every real top-up webhook is dropped. Check whether a real top-up happened in the window (users report
+"paid but not credited"; pending `TOPUP` rows). If so, put the current dashboard key into Vault, restart api; pending
+top-ups are credited when the user's app calls `/wallet/topup/verify`.
+
+## PaystackWebhookVerifyUnavailable
+Warning, same file: ≥3 webhook 503s in 30 min. Since #69 the API asks Paystack to confirm every wallet top-up and withdrawal
+outcome before money moves; when Paystack cannot be asked (network, 5xx, 429) it answers 503 and Paystack redelivers.
+Nothing is lost, credits are delayed. Check the Paystack status page and `api-egress` (NetworkPolicy, NAT); the API logs
+`could not verify ref=... with Paystack (<ExceptionType>)` with the cause class.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -173,4 +206,5 @@ Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring ge
 (`kubectl -n monitoring get pvc`); a system node roll. If **Prometheus** is down no other alert can fire — this is the
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
 log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift, WithdrawalUnresolved,
-WithdrawalRefundedByRecheck) cannot fire either.
+WithdrawalRefundedByRecheck, PaystackWebhookKeyMismatch, PaystackWebhookSignatureFailing,
+PaystackWebhookVerifyUnavailable) cannot fire either.

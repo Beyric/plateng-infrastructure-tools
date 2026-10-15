@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-15 13:40 WAT (refund to source #67 live, flag off, alembic head `d4b7f2a91c68`; open: Paystack webhook-key fix API #69) · earlier: 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-15 15:45 WAT (Paystack webhook-key trust #69 live `28e48768d0cd`, LIVE key emptied, Loki alerts gitops #74) · earlier: 2026-10-15 13:40 WAT (refund to source #67 live, flag off, alembic head `d4b7f2a91c68`) · earlier: 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -339,6 +339,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Backlog — identified, not yet scheduled
 
+- [x] **Paystack webhook-key trust** — Weysure-API #69 live 2026-10-15 14:13 UTC (`28e48768d0cd`); Vault LIVE placeholder emptied; look-back clean; test top-up verified *([SOP](../sop/2026-10-15-paystack-webhook-key-trust.md))*
+  - [ ] Loki alerts `PaystackWebhook*` — gitops #74 (tested; awaiting merge)
+  - [ ] **Launch gate:** `PAYSTACK_SECRET_KEY` = `sk_live_`; TEST empty or prod's own key; no `[CONFIG] Paystack` warning
+
 - [x] ~~CloudFront distributions~~ — superseded by Cloudflare free edge *(ADR-011)*
 - [x] ~~WAF~~ — included in the Cloudflare free plan *(ADR-011)*
 - [ ] Multi-arch (ARM64) image builds, prerequisite for Graviton
@@ -362,6 +366,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Blackbox 2 replicas + `absent(probe_success)` alert | Found by Finding ㊺; probes were blind for 30 min | Before go-live | — |
 | Replace node `ip-10-0-4-83` | Holds 7 scattered addresses, blocks 6 blocks | **Now** — right after the reservations are applied | — |
 | **Larger subnets for nodes** (two /20, blue/green node groups) | A /24 has 14 usable /28 blocks; repaired with reservations for now | **Before go-live**, or `scripts/subnet-blocks.sh` exit 1 | — |
+| #69 follow-ups: verify 401/403 → 503; escrow re-verify; shutdown `CancelledError`; `/topup/verify` 404 after credit | Non-blocking; sent to developers 2026-10-15 | Before go-live | — |
 | Alert on `awscni_aws_api_error_count` | The cause has no alert; replicas-missing fires 10 min later | With the next monitoring PR | — |
 | CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
 | `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | **Accepted for now** (Adebayo, 2026-10-05); revisit with the right-sizing work | — |
