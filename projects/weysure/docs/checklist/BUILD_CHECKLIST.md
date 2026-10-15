@@ -347,7 +347,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] Dashboard checks §2: parking records replaced, Full (strict), token covers weysure.com, no rules to mirror, no mobile app
   - [x] Phase A: DNS, chart `extraHosts` (gitops #75), staging cert proof, both hosts served — 2026-10-15
   - [x] Phase A5: `www` → apex 301 (Cloudflare rule) — verified 2026-10-15 (path and query kept)
-  - [ ] Phase B: API settings, web rebuild, Paystack/Dojah URLs, probes
+  - [x] Phase B1+B4: API settings, CORS for both origins, probes — gitops #78, 2026-10-15
+  - [ ] Phase B2: web `Jenkinsfile` → `api.weysure.com` (developers) · B3: Paystack/Dojah URLs (Adebayo)
   - [ ] Phase C: old web host 301; old API host retired after a 14-day soak
 
 - [x] **Paystack webhook-key trust** — Weysure-API #69 live 2026-10-15 14:13 UTC (`28e48768d0cd`); Vault LIVE placeholder emptied; look-back clean; test top-up verified *([SOP](../sop/2026-10-15-paystack-webhook-key-trust.md))*
