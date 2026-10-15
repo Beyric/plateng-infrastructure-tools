@@ -339,6 +339,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ## Backlog — identified, not yet scheduled
 
+- [x] **Login tokens in logs** — Alloy redacts JWTs in all namespaces (gitops #79); `SECRET_KEY` rotated 2026-10-15 22:12 UTC to void the 367 stored tokens *([SOP](../sop/2026-10-15-jwt-in-logs-redaction.md))*
+  - [ ] Developers: Weysure-API#76 (API-side redaction, token out of the URL, shorter token lifetime)
+  - [ ] Loki tripwire alert on JWT-shaped strings
+
 - [x] **Wallet reconciliation as one worker job** — Weysure-API #68 live 2026-10-15 19:07 UTC (`7249abff973c`); gitops #76 (worker flags + `WalletLotDrift` reads api-worker), #77 (`WalletReconciliationMissing`) *([SOP](../sop/2026-10-15-recon-loop-worker-job.md))*
   - [ ] Scale `api-scheduler` to 0 (~2026-10-18), then remove it
 
