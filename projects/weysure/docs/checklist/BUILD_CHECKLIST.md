@@ -3,7 +3,7 @@
 > **Single source of truth for the whole build.** Updated as part of the work, never
 > afterwards. An item is checked only when it is done **and verified**.
 >
-> **Last reconciled:** 2026-10-16 10:45 WAT (admin hardening #70 live `38b579b34f51`, no migration) · earlier: 2026-10-15 15:45 WAT (Paystack webhook-key trust #69 live `28e48768d0cd`, LIVE key emptied, Loki alerts gitops #74) · earlier: 2026-10-15 13:40 WAT (refund to source #67 live, flag off, alembic head `d4b7f2a91c68`) · earlier: 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
+> **Last reconciled:** 2026-10-16 12:05 WAT (ADR-024 repaired with `minDomains: 2`, gitops #82; #70 closed; #75 platform prep gitops #80/#81) · earlier: 2026-10-16 10:45 WAT (admin hardening #70 live `38b579b34f51`, no migration) · earlier: 2026-10-15 15:45 WAT (Paystack webhook-key trust #69 live `28e48768d0cd`, LIVE key emptied, Loki alerts gitops #74) · earlier: 2026-10-15 13:40 WAT (refund to source #67 live, flag off, alembic head `d4b7f2a91c68`) · earlier: 2026-10-13 18:50 WAT (risk holds #64 live, flags off, alembic head `58f3a1c7e0b9`) · earlier: 2026-10-13 15:40 WAT (Traefik NLB-only, gitops #71; real client IP live, Weysure-API #66) · earlier: 2026-10-13 13:20 WAT (web #48 7c live; ORIGIN_RULES_ENFORCED on, gitops #72; Weysure-API #65 live) · earlier: 2026-10-13 09:45 WAT (api/web hard spread live, gitops #70) · earlier: 2026-10-13 01:35 WAT (NLB Cloudflare-only live, gitops #69; old RDS deleted with final snapshot) · previous: 2026-10-12 14:30 WAT (Weysure-API #63 admin follow-ups live, #62 identity UX live `e120fd364ce7`, alembic head `c9a4e1b7d230`; 2nd superadmin verified; Resend email live (Vault v11); web #47 live `0456c8424250`; open: old RDS deletion 13 Oct, email sender switch) — handoff: `HANDOFF-master.md` (untracked, projects/)
 >
 > **Presentable version:** [Weysure Platform Blueprint](https://claude.ai/code/artifact/41d69692-4940-4751-8a21-0e46c8ba1bae)
 
@@ -319,6 +319,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `IDENTITY_RELEASE_ENABLED` **not** set in prod (Adebayo, 2026-10-12): release identity answers 403 on prelaunch
   - [x] API email moved to **Resend**, From `support@weysure.com` (Vault v11, 2026-10-12 14:27 UTC; test reset DKIM/SPF pass) — [SOP](../sop/2026-10-12-resend-email-switch.md). Applied ahead of web #47 (process note in SOP)
 - [x] api/web replicas never share a node: hostname spread `DoNotSchedule` for api and web *(gitops #70, live 2026-10-13 08:37 UTC; ADR-024; [SOP](../sop/2026-10-13-api-web-hard-spread.md))*: api and web each on 2 nodes, 0 Pending, sites 200
+  - [x] **Repaired 2026-10-16:** consolidation had packed all replicas onto one workload node; `minDomains: 2` (gitops #82, live 10:58 UTC) *([SOP](../sop/2026-10-16-adr024-min-domains.md))*
+  - [ ] Confirm steady state settles to 2 workload nodes after the Jenkins build node goes
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -362,8 +364,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] **Launch gate:** `PAYSTACK_SECRET_KEY` = `sk_live_`; TEST empty or prod's own key; no `[CONFIG] Paystack` warning
 - [x] **Admin hardening** — Weysure-API #70 live 2026-10-16 09:37 UTC (`38b579b34f51`, same tree as approved `360e994`); no migration; OpenAPI shows `AdminStatusUpdate`/`AdminManage` *([SOP](../sop/2026-10-16-admin-hardening-release.md))*
   - [x] Review (Opus, permission checks + row locks): GO at `360e994`
-  - [ ] Developers' refused action in prod (409 `SELF_ACTION` or 422)
-- [ ] **Deal invites** — Weysure-API #75 (ships off, `DEAL_INVITES_ENABLED=false`): review next, one release at a time
+  - [x] Refused actions in prod: 422 + 409 `SELF_ACTION` (Traefik), 2026-10-16 10:38 UTC — closed
+- [ ] **Deal invites** — Weysure-API #75 (ships off, `DEAL_INVITES_ENABLED=false`): review next, one release at a time *([prep SOP](../sop/2026-10-16-deal-invites-platform-prep.md))*
+  - [x] Invite-token log redaction by path (Alloy, gitops #80) + Docker test; live 10:27 UTC
+  - [x] Migrate Job deadline 900 s (gitops #81; applies at #75's sync — check then)
+  - [x] `statement_timeout` on the migrate identity = 0 (verified, no change)
+  - [ ] Developers rebase #75 on `c737902`; review (Opus) and go for the exact commit
+  - [ ] Release: Job deadline 900 on the Job, `indisvalid = t`, `DEAL_INVITES_ENABLED=false`, worker on the same image
 
 - [x] ~~CloudFront distributions~~ — superseded by Cloudflare free edge *(ADR-011)*
 - [x] ~~WAF~~ — included in the Cloudflare free plan *(ADR-011)*
@@ -393,7 +400,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | Alert on `awscni_aws_api_error_count` | The cause has no alert; replicas-missing fires 10 min later | With the next monitoring PR | — |
 | CNI warm target (`WARM_IP_TARGET`) | Every node holds a spare block | After node replacement, one change at a time | — |
 | `KubeCPUOvercommit` / `KubeMemoryOvercommit` | Fire because Karpenter packs nodes (requests > allocatable minus the largest node); Pending pods are caught by `KubePodNotReady` | **Accepted for now** (Adebayo, 2026-10-05); revisit with the right-sizing work | — |
-| ResourceQuota `limits.cpu=8` in `weysure-prod` leaves no surge room (**seen twice**: #63 rollout 2026-10-12 13:13, api-worker): during the #61 rollout (2026-10-10 20:08–20:12) api/api-worker surge pods hit `FailedCreate … exceeded quota` and the roll ran one-out-one-in (~2 min slower, briefly 1 api replica) | Rollout still completes; no errors | Right-sizing work, or before api replicas > 2 (quota headroom of one pod's limits, or `maxSurge: 0`) | — |
+| ResourceQuota `limits.cpu=8` in `weysure-prod` leaves no surge room (seen on almost every roll; 2026-10-16 #70 and #82 rolls, and Argo now shows `Degraded` ~1 min from the `ReplicaFailure`; earlier: #63 rollout 2026-10-12 13:13, api-worker): during the #61 rollout (2026-10-10 20:08–20:12) api/api-worker surge pods hit `FailedCreate … exceeded quota` and the roll ran one-out-one-in (~2 min slower, briefly 1 api replica) | Rollout still completes; no errors | Right-sizing work, or before api replicas > 2 (quota headroom of one pod's limits, or `maxSurge: 0`) | — |
 | Kaniko cache in its own ECR repo | `--cache-repo` shares the app repo; ~$0.50/mo | Cache grows, or ECR cost matters | — |
 | Tighter `api-egress` blocked list (all private, link-local, CGNAT) | Needed when merchant webhooks go through the worker | The developers' webhook PR | — |
 | Sleep stops RDS? | Saves ≈ $0.40/day; made the platform un-wakeable on 2026-10-08 | Before the next sleep | — |

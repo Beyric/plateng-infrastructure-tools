@@ -6,7 +6,7 @@
 Developers' note: `weysure/docs/platform-note-2026-10-14-admin-hardening.md`; our replies:
 `platform-reply-2026-10-16-70-go.md`, `platform-reply-2026-10-16-70-live.md`
 
-**Status: live and verified (platform side). Developers' one refused-action check in prod still pending.**
+**Status: live and verified, closed 2026-10-16 10:38 UTC** (refused-action checks below).
 
 ## Why
 
@@ -43,7 +43,7 @@ Review (Opus, security-critical: permission checks + row locks). **GO at exactly
 | New code is serving (no credentials) | `/api/v1/openapi.json` schemas: `AdminStatusUpdate` (`is_active` required boolean), `AdminManage` — 0 → 2 vs pre-merge baseline |
 | Errors | 0 error/traceback lines from new pods; `[ERROR] Worker … SIGTERM` only from old pods (shutdown) |
 | Traefik | no 5xx on the API router since the roll (low traffic) |
-| Developers' refused action (409 `SELF_ACTION` / 422) | **pending** |
+| Refused actions in prod (Traefik access log) | Developers 10:20 UTC: `PUT /admin/<id>` → 422, → 409 (107 B). Adebayo 10:38 UTC (`refusal70.sh`, token read silently): `update-status/<made-up id>` `{}` → **422** (92 B; the old code would answer 404, so this step is safe on either version and gates the next); `update-status/<own id>` `{"is_active": false}` → **409 `SELF_ACTION`** (107 B); `/admin/me` before/after unchanged |
 
 Rollout note: surge pod `FailedCreate … exceeded quota limits.cpu=8` again; the roll ran one-out-one-in. Known (deferred
 table, right-sizing).
@@ -55,6 +55,13 @@ table, right-sizing).
 - Prod serves the OpenAPI schema at `/api/v1/openapi.json` (`/openapi.json` is 404): diffing schema keys before/after
   proves a release that adds request models is serving, with no token and no PII.
 - Alertmanager via `kubectl get --raw …/proxy` hangs (default-deny NetworkPolicy); use `port-forward`.
+
+## After the release
+
+- Weysure-API #77 (docs only) was merged 10:26 UTC without our go; its main build #59 was aborted by the 10:30 spot
+  interruption, so nothing was promoted. Decided: do not re-run it; #77 ships with #75's build. Developers told.
+- Same endpoint, three sizes: 403 / 30 B = auth stopped it (no token), 422 = body refused before the handler,
+  409 / 107 B = the guard ran.
 
 ## Operate / roll back
 
