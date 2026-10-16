@@ -647,3 +647,9 @@ one spot node, so a single spot interruption would take both sites down. Develop
 
 **Consequences.** At least two workload nodes are always needed (true today; otherwise Karpenter adds one small spot node).
 A spot shortage leaves the second replica Pending while the old pod serves. Every chart template change restarts all pods.
+
+**Amendment 2026-10-16 (gitops #82).** `DoNotSchedule` alone did not hold: the spread counts only nodes the pod may use
+(`node-role=workload`), and after Karpenter consolidated to one workload node, one node was "balanced" and all api and web
+replicas sat on it (found after a 10:30 UTC spot interruption, which itself caused 0 errors because the replicas were
+still spread then). Added `minDomains: 2` (Karpenter v1.14.1 honours it): the second replica stays Pending until a second
+workload node exists. Cost: one more spot node. [SOP](../docs/sop/2026-10-16-adr024-min-domains.md).

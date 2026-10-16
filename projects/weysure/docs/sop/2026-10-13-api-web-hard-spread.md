@@ -61,4 +61,6 @@ Revert gitops #70 (another rolling restart of all Weysure pods).
 ## Follow-ups
 
 - Namespace quota `limits.cpu=8` throttles every rollout (seen 4 times). Raise it or right-size limits before the next release window.
-- Interview/ops note: a hard spread rule is a standing claim on two nodes; consolidation will not pack below that.
+- ~~Interview/ops note: a hard spread rule is a standing claim on two nodes; consolidation will not pack below that.~~
+  **Wrong (2026-10-16):** the spread counts only existing eligible nodes, so consolidation *did* pack to one node. Fixed
+  with `minDomains: 2`, see [2026-10-16-adr024-min-domains](2026-10-16-adr024-min-domains.md).
