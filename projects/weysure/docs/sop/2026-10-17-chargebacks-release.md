@@ -55,7 +55,7 @@ rolling 21:56–21:58. Don't read "old schema" as stuck until Argo's revision an
 | Off is inert | worker startup sweeps 21:57:22: `ensure_recoveries/response_jobs/sync/debt_sweep` `0 job(s) scheduled` |
 | Flags | no `CHARGEBACK*` key in gitops prod |
 | Pods / edge | 4/4 on tag, 0 restarts, api on two nodes; 0 errors, 0 × 5xx, health 200 |
-| Reconciliation | last run 21:51:31 `1 users, 0 mismatches` (old worker); **new worker's first run due ~22:21 UTC — pending at write time**, confirm in Loki (`pod=~"api-worker-5c4f874659-.*"`) |
+| Reconciliation | old worker's last run 21:51:31 `1 users, 0 mismatches`; new worker (`api-worker-5c4f874659-dcfj5`, Loki `pod=~"api-worker-5c4f874659-.*"`): 22:21:45 and 22:51:56 UTC `1 users, 0 mismatches`, each followed by `rescheduled to` +30 min (proof the loop runs, not just silence) |
 
 ## Operate / roll back
 
