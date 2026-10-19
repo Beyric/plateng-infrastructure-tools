@@ -39,7 +39,7 @@ merchant payouts are excluded by design (KYB + API-key limits).
 | New code serving (no credentials) | public OpenAPI: `WalletHoldOut` gained `reason_codes`; "Withdrawals need Tier 2" 0 → 2 (admin tier-limit routes). Baseline captured before merge |
 | Pods / edge | 4/4 on tag, 0 restarts, api on two nodes; 0 errors, 0 × 5xx (69 api lines), health 200 |
 | Worker | reconciliation 23:14:14 UTC `1 users, 0 mismatches` |
-| End to end | **pending:** developers' Tier-1 → 422 `KYC_TIER_REQUIRED`, Tier-2 → withdraw succeeds; match times in Traefik |
+| End to end | **pending:** developers' Tier-1 → **403** `KYC_TIER_REQUIRED` (`KycError` default status; corrected 2026-10-19 — earlier text said 422), Tier-2 → withdraw succeeds; match times in Traefik |
 
 ## Operate / roll back
 
