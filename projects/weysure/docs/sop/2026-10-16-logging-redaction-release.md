@@ -91,6 +91,8 @@ curl -sG localhost:13100/loki/api/v1/query --data-urlencode \
 
 ## Follow-ups (sent to developers in the go reply, non-blocking)
 
+**1–4 done:** Weysure-API #91 + #99, live 2026-10-20 — [SOP](2026-10-20-logging-followups-release.md). **5 done:** #90/#57 — [SOP](2026-10-19-idempotent-build-push.md).
+
 1. Keep the `args` tuple in `_RedactTokens` (dev `uvicorn` access lines) — reuse `log_redaction.py`'s pattern.
 2. Reconciliation "location" is the deepest frame (SQLAlchemy/psycopg); prefer the last frame under `app/`.
 3. Other `log.exception` sites still print exception text (Postgres `DETAIL: Key (email)=(…)`): audit DB paths.
