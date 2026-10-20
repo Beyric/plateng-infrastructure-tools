@@ -321,6 +321,9 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] api/web replicas never share a node: hostname spread `DoNotSchedule` for api and web *(gitops #70, live 2026-10-13 08:37 UTC; ADR-024; [SOP](../sop/2026-10-13-api-web-hard-spread.md))*: api and web each on 2 nodes, 0 Pending, sites 200
   - [x] **Repaired 2026-10-16:** consolidation had packed all replicas onto one workload node; `minDomains: 2` (gitops #82, live 10:58 UTC) *([SOP](../sop/2026-10-16-adr024-min-domains.md))*
   - [ ] Confirm steady state settles to 2 workload nodes after the Jenkins build node goes
+- [ ] SonarQube + sonar-postgres `karpenter.sh/do-not-disrupt` via chart values *(gitops [#85](https://github.com/Beyric/plateng-gitops/pull/85) open 2026-10-20; [SOP](../sop/2026-10-20-sonarqube-do-not-disrupt.md))*: consolidation moved Sonar mid-scan, PR-107 #1 `Connection refused` 16:40:45 UTC
+  - [x] Rendered + server dry run + pre-commit green locally
+  - [ ] Merged with no build in its Quality gate stage; both pods `DND=true`; a `DisruptionBlocked … sonarqube` event seen
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
@@ -431,7 +434,8 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 | SonarQube `-pr` project measures "new code" against the previous PR's analysis: same commit FAILED then PASSED (Weysure-API #64, 2026-10-13) | Community Edition: one history per project | Before relying on the gate for a security change; options: analyse `main` first in PR builds, branch plugin, or Developer Edition | — |
 | `jenkins` namespace has no NetworkPolicy: agents run developers' PR code with open egress/ingress inside the cluster | Not yet designed (agents need GitHub, ECR, Sonar, the API server) | Before any secret reaches PR builds | — |
 | No deploy hold: developers merged Weysure-API #65 during a platform rollout (2026-10-13) | Process | Next unannounced merge | — |
-| SonarQube evictions: Karpenter consolidation / spot moves the single Sonar pod (3× on 2026-10-09; Weysure PR-38 #1 failed). Option: `karpenter.sh/do-not-disrupt` on the pod | Parked by Adebayo 2026-10-09 | Builds failing on `Failed to connect` to Sonar again | — |
+| SonarQube evictions: **consolidation** part fixed by gitops #85 (see Phase 10); **spot interruption / expiry** can still move Sonar | Forced disruptions ignore `do-not-disrupt` | Builds failing on `Connection refused` to Sonar after #85 is live → on-demand CI NodePool or scanner retry | — |
+| NodePool `default` has `expireAfter: 720h` but no `terminationGracePeriod`: an expiring node hosting a `do-not-disrupt` pod (redis-0, SonarQube, sonar-postgres) can hang mid-drain (Karpenter docs) | Applies to every pod incl. Jenkins agents and lets drift override do-not-disrupt: separate decision | Before the oldest workload node reaches 30 days (`ip-10-0-4-18` ≈ 2026-11-15) | — |
 | Stable internal DNS name for the database | Endpoint change touched chart + Vault + Terraform | Next database change | — |
 | Two reconciliation schedulers per api-scheduler pod (gunicorn `--max-requests` recycles a worker ~every 2 h 45 min; each worker starts the scheduler; `WEB_CONCURRENCY=2`) | Harmless while the notification cooldown dedups | Developers move scheduled work to one process, or drift/notification noise | — |
 | No "reconciliation stopped" alert (`WalletLotDrift` is silent if the scheduler stops) — **trigger passed: flag went on 2026-10-13 without it** | Needs a positive per-run log line (asked of developers 2026-10-13) | When the per-run line ships | — |
