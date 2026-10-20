@@ -52,6 +52,21 @@ in the same request as a control.
 | Errors / edge | — | 6 × `Worker … was sent SIGTERM!` (old pods, roll); 0 × 5xx in 109 Traefik api lines; health 200 both API hosts + web; Argo 32/32 |
 | Reconciliation | — | new worker 13:12:43 UTC `wallet reconciliation: 1 users, 0 mismatches`, handler line `:53` (was `:56` on #78's code) |
 
+Probe (run on the old image first for the "before"; needs `AWS_PROFILE=beyric-admin`; the handshake 403s on the fake token, which is fine):
+
+```bash
+m="probe91-<label>-$(date +%s)"
+kubectl -n monitoring port-forward svc/loki 13100:3100 >/dev/null 2>&1 &
+W="https://api.weysure.com/api/v1/ws/messages"
+for q in "token=$m-t&refresh_token=$m-a" "token=$m-u&id_token%3D$m-b"; do
+  curl -s --http1.1 -o /dev/null -w "%{http_code}\n" -m 10 -H "Connection: Upgrade" -H "Upgrade: websocket" \
+    -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: $(head -c 16 /dev/urandom | base64)" "$W?$q"
+done
+sleep 45   # Alloy
+# any hit = a value written raw; the after-state must return nothing here
+curl -sG localhost:13100/loki/api/v1/query_range --data-urlencode "query={namespace=\"weysure-prod\", container=~\"api.*\"} |= \"$m\""
+```
+
 **Seen, not #91's scope:** Traefik's access log keeps the raw query string (`?refresh_token=…`). Real tokens there are JWTs,
 which Alloy masks in every namespace; #76 part 2 (token out of the URL) is the real fix.
 
