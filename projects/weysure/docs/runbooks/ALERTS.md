@@ -89,6 +89,19 @@ raise `consolidateAfter` in `platform/karpenter/nodepool.yaml`; drift → an AMI
 No Karpenter node for 10 min. Expected while asleep. Otherwise Karpenter cannot launch: its logs, the NodePool
 `limits` (sleep sets cpu 0 — did wake restore it?), spot capacity in both AZs, the EC2 spot service-linked role.
 
+## KarpenterNodeStuckDraining
+A node has carried the `karpenter.sh/disrupted` taint for over 1 h (normal drains take ≤ ~20 min). Usually it is a
+forced drain (`expireAfter: 720h`) blocked by a `karpenter.sh/do-not-disrupt` pod: `redis-0`, `sonarqube-sonarqube-0` or
+`sonar-postgres-0`. The NodePool has **no `terminationGracePeriod` on purpose** (SOP `2026-10-20-sonarqube-do-not-disrupt`),
+so a person finishes the drain. Nothing is down: the pods keep running, and the node only refuses new pods.
+1. Find what holds it (replace NODE with the alert's `node`): `kubectl get pods -A --field-selector spec.nodeName=NODE -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,DND:'.metadata.annotations.karpenter\.sh/do-not-disrupt'`
+2. **SonarQube / sonar-postgres:** wait until no Jenkins build is in its Sonar / Quality gate stage (a restart kills
+   running scans), then `kubectl -n sonarqube delete pod sonar-postgres-0` and, once it is Ready, `kubectl -n sonarqube delete pod sonarqube-sonarqube-0` (~2 min down).
+3. **redis-0:** cache and rate limiting with AOF on its PVC, so it survives the restart; the API loses Redis for the
+   seconds the pod and its EBS volume take to move. Delete it at a quiet time:
+   `kubectl -n weysure-prod delete pod redis-0`.
+4. A Jenkins agent holding it finishes on its own; wait for the build. Then confirm the node is gone: `kubectl get nodeclaims`.
+
 ## JobsQueueLagging
 From the Loki ruler, not Prometheus: the oldest overdue job in the Postgres `jobs` table has waited more than 5 min
 (api-worker logs one `"event": "jobs_stats"` line a minute). Escrow timers (auto-release, deadlines, expiries, dispute

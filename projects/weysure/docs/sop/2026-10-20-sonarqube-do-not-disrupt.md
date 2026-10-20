@@ -1,9 +1,9 @@
 # SOP — SonarQube and its DB protected from Karpenter consolidation (`do-not-disrupt`)
 
-**Shipped:** plateng-gitops [#85](https://github.com/Beyric/plateng-gitops/pull/85) (`98b8931`), **open, not merged yet**
+**Shipped:** plateng-gitops [#85](https://github.com/Beyric/plateng-gitops/pull/85), merged 2026-10-20 17:05:02 UTC (`2609e16`); stuck-drain alert [#86](https://github.com/Beyric/plateng-gitops/pull/86) (open)
 · **Kind:** platform fix, GitOps config · **Cost delta:** ≤ ~one small spot node kept (≈ $0–25/mo, usually $0)
 
-**Status: PR open. Verified locally (render, server dry run, pre-commit). Not yet live. Post-merge checks are below.**
+**Status: live and verified (17:08 UTC): both pods `do-not-disrupt=true`, Ready on `ip-10-0-4-35`; Karpenter logged `DisruptionBlocked … Pod=sonarqube/sonar-postgres-0`.**
 
 ## What happened
 
@@ -79,6 +79,32 @@ kubectl get events -A --field-selector involvedObject.kind=Node --sort-by=.lastT
 Expected: `sonarqube` is Synced/Healthy at the merge commit (its sync revision is the chart version 2026.4.1, so judge it
 by pod age), both pods show `DND=true`, and within a day a `DisruptionBlocked … Pod=sonarqube/…` event appears on the Sonar node.
 
+## Decision: no `terminationGracePeriod` (Adebayo, 2026-10-20, option A)
+
+With `expireAfter: 720h` and no `terminationGracePeriod`, a node that expires while it holds a do-not-disrupt pod is
+tainted `karpenter.sh/disrupted` and **never finishes draining by itself**. The pods keep running and the node takes no
+new pods. Setting a grace period looks like the fix, but it is not:
+
+| Fact (read-only, 2026-10-20) | Consequence of a grace period |
+|---|---|
+| EC2NodeClass `amiSelectorTerms: alias: al2023@latest` | every EKS AMI release (every week or two) marks every workload node as drifted |
+| Karpenter docs: with a `terminationGracePeriod`, drift may disrupt a node "even if there are pods with blocking PDBs" / do-not-disrupt | Sonar, sonar-postgres and redis get force-deleted when the grace period ends. They never exit on their own, so the grace period only delays the kill, at a time Karpenter picks |
+| Docs: "changing this value in the nodepool will drift the nodeclaims" | merging it marks all 4 workload nodes as drifted at once, and existing NodeClaims keep `<none>`, so it does not even cover today's nodes |
+
+| Option | Verdict |
+|---|---|
+| **A. No grace period; alert + manual drain** | **Chosen.** We pick when Sonar restarts. The cost is one manual step per node per 30 days |
+| B. Grace period of about 2 h now | Rejected: brings back random Sonar kills (on AMI releases) and replaces all workload nodes at merge |
+| C. Pin the AMI alias to a version, then add a grace period | The right long-term setup (drift only when we bump the version), but AMI updates become our job. In backlog |
+
+**Alert** (gitops #86): `KarpenterNodeStuckDraining`, `max by (node) (kube_node_spec_taint{key="karpenter.sh/disrupted"}) == 1`
+for 1h, warning. Threshold measured in the live Prometheus: 44 drained nodes in 7 days held the taint for at most
+19 samples (about 20 min or less). Test: `bash platform/monitoring/tests/prometheus-rules-test.sh` (promtool v3.14.0;
+no alert at 50 min, alert at 75 min; decoys are a 20-min drain and another taint key; a mutant `for: 30m` fails it).
+Response steps: runbook `ALERTS.md#karpenternodestuckdraining`.
+
+**First expected:** `ip-10-0-4-18` (redis-0), created 2026-10-16 12:10 UTC, expires **2026-11-15 ~12:10 UTC**.
+
 ## Operate / roll back
 
 - **Merge timing:** the pod template changes, so on sync **both pods restart once** (SonarQube is down for about 2 min, and
@@ -90,9 +116,6 @@ by pod age), both pods show `DND=true`, and within a day a `DisruptionBlocked �
 
 ## Follow-ups
 
-- **`terminationGracePeriod` on NodePool `default`.** With `expireAfter: 720h` and no `terminationGracePeriod`, Karpenter
-  warns that an expiring node hosting a do-not-disrupt pod can hang mid-drain. `redis-0` already carries this risk, and
-  this change adds the Sonar pods. A value such as `24h` bounds it, but it applies to every pod, including Jenkins agents,
-  and it lets drift override do-not-disrupt. That makes it a separate decision and a separate PR.
+- Option C (pin the AMI alias, then `terminationGracePeriod`): backlog.
 - Spot interruptions can still move SonarQube. If builds keep failing on `Connection refused` after this change, consider
   an on-demand CI NodePool or retries in the Jenkinsfile's scanner step (developers).
