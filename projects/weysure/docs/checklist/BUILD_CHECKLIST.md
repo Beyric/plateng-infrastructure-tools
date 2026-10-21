@@ -387,7 +387,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [x] **Withdrawals need Tier 2** — Weysure-API #88 live 2026-10-16 23:03 UTC (`681ce3b37762`), migration `e1a7c4d9b3f2` (data-only), tree == approved `b64cd73` *([SOP](../sop/2026-10-16-withdraw-tier2-release.md))*
   - [x] Review (money path): gate in `open_withdrawal`, every transfer site traced, 924 tests; prod counts: 0 pending below T2, 1 user
   - [x] Live: Job log, `alembic current` + `out_30d` T1 0 (Adebayo), OpenAPI `reason_codes`, 0 × 5xx
-  - [ ] Developers' end-to-end: Tier-1 → 422 `KYC_TIER_REQUIRED`, Tier-2 withdraws (times → Traefik)
+  - [ ] Developers' end-to-end: Tier-1 → 403 `KYC_TIER_REQUIRED` (JSON body with `code`, so larger than the 30 B `HTTPBearer` 403), Tier-2 withdraws (times → Traefik)
   - [ ] Developers' follow-up: Tier-2 re-check in `approve_withdrawal` + worker retries
 - [x] **Argo `root` OutOfSync loop fixed** — plateng-gitops #83 (`752c917`, 2026-10-17 14:53 UTC) + hand-applied `root-app.yaml`: root ignores Argo's own `pre-delete-finalizer*` on child apps; 32/32 Synced *([SOP](../sop/2026-10-17-argo-root-predelete-finalizers.md))*
 - [x] **Card chargebacks (off)** — Weysure-API #79 live 2026-10-17 21:58 UTC (`a9e66abf2ebb`), migration `a7e3c9b25d14` (expand-only), tree == approved `44f62bf` *([SOP](../sop/2026-10-17-chargebacks-release.md))*
