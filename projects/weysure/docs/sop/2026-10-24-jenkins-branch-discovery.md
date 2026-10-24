@@ -1,9 +1,9 @@
 # SOP: Jenkins builds only `main`, `release/*` and PRs
 
-**Shipped:** plateng-gitops [#90](https://github.com/Beyric/plateng-gitops/pull/90) (`1e63105`), **open, not merged** ·
+**Shipped:** plateng-gitops [#90](https://github.com/Beyric/plateng-gitops/pull/90) (`1e63105`), **merged 2026-10-24 18:30 UTC as `2e4ba9f8`** ·
 **Kind:** Jenkins JCasC (Job DSL org folder) · **Cost delta:** fewer agent pods and spot nodes after every release merge
 
-**Status: PR open 2026-10-24. Not live.** Update this line once it is merged and verified.
+**Status: live 2026-10-24.** Merged with no agent pod running; the first branch scan after it (18:33 UTC) reports "Does not meet criteria" for non-matching branches, and `main` built afterwards (#81). Still to see: a new PR build under the filter.
 
 ## Why
 
