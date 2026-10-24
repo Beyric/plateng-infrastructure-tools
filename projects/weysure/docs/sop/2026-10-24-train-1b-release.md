@@ -38,7 +38,7 @@ Developers' own SOP: `Weysure-API/docs/sop/2026-10-21-train-1b-integration.md`. 
 |---|---|---|
 | **API Jenkinsfile 45-min timeout < main build time** (5181 tests) | every API main build aborts; PR builds pass by seconds (PR-123 #2: 44:28) | devs: one-line hotfix PR to 90 min before the next API merge; `pytest-xdist` in Train 2 |
 | A green PR build is not proof a main build fits | main runs Build & push, Image scan, Promote on top | check main duration vs. timeout after any big test growth |
-| us-east-1b prefix exhaustion again: agent pod for #80 waited ~55 min; Karpenter node `ip-10-0-4-243` (m5.xlarge) **NotReady 52 min**, removed by Karpenter once empty | release delayed ~1 h before the build started | open (handoff §6 item 6): zone spread / secondary CIDR / bigger subnets. gitops #90 removed the stale-branch-build trigger |
+| us-east-1b prefix exhaustion again: agent pod for #80 waited ~55 min; Karpenter node `ip-10-0-4-243` (m5.xlarge) **NotReady 52 min**, removed by Karpenter once empty | release delayed ~1 h before the build started | open (handoff §6 item 6): zone spread / secondary CIDR / bigger subnets. gitops #90 removed the stale-branch-build trigger (effective only from the 20:24 UTC organization scan, see its SOP) |
 | Consolidation 2 min after the roll (`Evicted pod: Underutilized`) | Argo `Degraded` briefly; same image, same ReplicaSet | expected; not a rollout. Check the tag, not the pod age |
 
 ## Verification (all live, 2026-10-24)
