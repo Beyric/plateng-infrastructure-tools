@@ -22,7 +22,7 @@ per-build unique project names (orphans need a sweeper), diffing issue lists our
 
 | Where | Change |
 |---|---|
-| SonarQube UI | Quality gate **`weysure-pr`**: New issues > 0 only (no coverage, duplication or hotspot conditions: with SCM off each measures the whole repo). Assigned to `weysure-api-pr`, `weysure-web-pr`. Main projects keep their gate |
+| SonarQube UI | Quality gate **`weysure-pr`**: New issues > 0 only (no coverage, duplication or hotspot conditions: with SCM off each measures the whole repo). **Correction 2026-10-24: not created on 10-21** (see below); created 2026-10-24 10:10 UTC. Not the default gate. Not assigned by hand: B1 selects it on every PR build, because recreating a project resets it to the default gate. Main projects keep the default "Sonar way" |
 | SonarQube UI | User **`jenkins-sonar-pr`** (local, password discarded): global **Create Projects** only; Default template "Project Creators" = Administer; Administer on the two existing `-pr` projects; **user token**, 90 days |
 | Vault `secret/platform/jenkins` | new key `sonar_pr_admin_token` (`kv patch`, stdin via `read -rs` + `printf %s`): len 44, no trailing newline, other 4 keys kept |
 | gitops `bootstrap/apps/jenkins.yaml` | `additionalExistingSecrets` + JCasC string credential **`sonar-pr-admin-token`** |
@@ -44,7 +44,23 @@ The Jenkins pod mounts the key as a file; merging first would leave `jenkins-0` 
 | Secret `jenkins/jenkins-platform` | key names include `sonar_pr_admin_token` before merge |
 | Argo | root `92aaf4d`; `jenkins` Synced/Healthy |
 | Jenkins | `jenkins-0` restarted, Ready; `/run/secrets/additional/jenkins-platform-sonar_pr_admin_token` present; credential id in `credentials.xml`; log `Jenkins is fully up and running` 23:36:36 UTC |
-| Not yet proven | that the token can delete/create/select-gate. First proven by the developers' throwaway proof PR |
+| Token can delete/create/select-gate | **proven 2026-10-24**: API PR-121 #4 / PR-122 #4: delete 204, create 200, select 204; PR-122 gate `new_violations` actual 1 (planted S1481 only) |
+
+### Correction (2026-10-24): the gate was missing
+
+All 12 developers' B1 builds (10-21 23:52 → 10-22 12:44 UTC) failed on `qualitygates/select` → **404**: gate `weysure-pr` did not exist.
+The SonarQube access log (from 10-17) shows the 10-21 23:19–23:27 UTC user/permissions/template/token calls and no
+`POST /api/qualitygates/create` at any time. This SOP and the checklist recorded the gate as done from the plan, not from the server.
+
+Second trap, same day: a **new gate is pre-filled with the four "Sonar way" conditions** (new issues, coverage < 80, duplication > 3,
+hotspots reviewed < 100). The first create left all four; Adebayo then deleted three. Verify the conditions in SonarQube's own DB (read-only):
+
+```
+kubectl -n sonarqube exec sonar-postgres-0 -- sh -c 'psql -U "${POSTGRES_USER:-sonarqube}" -d "${POSTGRES_DB:-sonarqube}" -At -c "select g.name, m.name, c.operator, c.value_error from quality_gates g left join quality_gate_conditions c on c.qgate_uuid=g.uuid left join metrics m on m.uuid=c.metric_uuid order by g.name;"'
+```
+
+Expected: `weysure-pr|new_violations|GT|0` and nothing else for `weysure-pr`. API calls of any kind (UI included) are in
+`/opt/sonarqube/logs/access*.log` in `sonarqube-sonarqube-0` (method, path, status, browser vs curl): check setup claims there.
 
 ## Risk
 
@@ -57,9 +73,10 @@ The Jenkins pod mounts the key as a file; merging first would leave `jenkins-0` 
 
 - Rotate: SonarQube → Users → `jenkins-sonar-pr` → Tokens → generate → `vault kv patch` as above → force-sync → JCasC reads the
   file only at start, so `kubectl -n jenkins rollout restart statefulset jenkins` (Adebayo, between builds) → revoke the old token.
-- Roll back: revert gitops #87 (Jenkins restarts); the Vault key can stay; un-assign `weysure-pr` (assign the old gate back) to undo A1.
+- Roll back: revert gitops #87 (Jenkins restarts); the Vault key can stay. To undo A1, revert the developers' B1 Jenkinsfile step (it selects `weysure-pr`); deleting the gate instead makes every PR build fail closed (select 404).
+- Rebuild the gate (if ever lost): Quality Gates → Create `weysure-pr` → **delete the pre-filled Coverage, Duplicated Lines, Security Hotspots Reviewed** → keep Issues > 0 → never "Set as default" → check with the DB query above.
 
 ## Follow-ups
 
-- Developers: B1 Jenkinsfile (API + web) + proof; A1 changed-line coverage (Train 2). Web needs #61 (SCM off) first.
+- Developers: B1 **API proven 2026-10-24** (GO #121 `78323f6`). **Web not proven**: PR-64 #4 failed with `new_violations` 345: the base scan in the hidden `.base-scan` worktree analysed only `tests/` + `e2e/` (231 vs 724 JS/TS files; most likely SonarQube skips hidden dirs with `sonar.sources=.`) → developers rename the worktree, re-prove #63/#64. A1 changed-line coverage (Train 2).
 - `jenkins` NetworkPolicy (deferred, trigger met).
