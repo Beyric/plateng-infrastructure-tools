@@ -422,13 +422,15 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] Web: SCM off in `-pr` scans, then proof with a fresh planted issue
   - [x] Web #61 (`d912f71`) proof run: planted #62 → New issues 2 (exactly the planted ones) ✓; but #61 alone FAILS: with SCM off all lines are new code → coverage on new code = whole repo (63%)
   - [ ] **A1** (decided 2026-10-21 23:45 WAT): separate `-pr` quality gate + changed-line coverage in PR builds
-    - [x] Platform: gate `weysure-pr` (New issues > 0 only) assigned to `weysure-api-pr` + `weysure-web-pr` *(Sonar UI, Adebayo, 2026-10-22)*
+    - [x] Platform: gate `weysure-pr` (New issues > 0 only, not default) — **created 2026-10-24** (the 10-22 tick was wrong: never created, every B1 build got select 404; [SOP correction](../sop/2026-10-22-sonar-pr-admin-credential.md)); selected per build by B1
     - [ ] Developers: changed-line coverage in PR builds (API `diff-cover` ≥80%, web `scripts/coverage-new-code.sh`) — Train 2
   - [ ] **Reopen hole → B1** (decided 2026-10-21 23:45 WAT): shared `-pr` project reopens a previously seen issue with its old date (PR-118 passed with S3776) → PR builds delete + recreate the `-pr` project and select `weysure-pr` under the lock
     - [x] Platform: SonarQube user `jenkins-sonar-pr` (Create Projects; Administer on `-pr` projects / projects it creates), 90-day user token in Vault `secret/platform/jenkins` `sonar_pr_admin_token` *(Adebayo, 2026-10-22)*
     - [x] Platform: Jenkins credential `sonar-pr-admin-token` (gitops [#87](https://github.com/Beyric/plateng-gitops/pull/87), `92aaf4d`; live 2026-10-21 23:36 UTC; [SOP](../sop/2026-10-22-sonar-pr-admin-credential.md))
     - [ ] Developers: Jenkinsfile (API + web) delete + create + gate-select before the base scan; fail closed on API errors and on no merge base
-    - [ ] Proof: re-planted previously-seen issue FAILS (New issues 1); clean candidate PASSES
+      - [x] API #121 `78323f6` / #122: proven 2026-10-24 (PR-121 #4 PASSED; PR-122 #4 FAILED `new_violations` 1 = planted S1481; fail-closed proven by the select-404 runs); GO sent — merge pending
+      - [ ] Web #63/#64: PR-64 #4 FAILED with 345 (base scan in hidden `.base-scan` analyses only `tests/`+`e2e/`); developers rename the worktree, re-prove
+    - [ ] Proof: re-planted previously-seen issue FAILS (New issues 1); clean candidate PASSES — API ✓, web pending
     - [ ] Rotate the `jenkins-sonar-pr` token before expiry (≈ 2027-01-19)
 
 - [x] ~~CloudFront distributions~~ — superseded by Cloudflare free edge *(ADR-011)*
