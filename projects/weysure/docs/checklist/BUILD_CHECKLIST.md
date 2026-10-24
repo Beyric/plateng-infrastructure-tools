@@ -327,6 +327,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] **No `terminationGracePeriod`** (Adebayo, 2026-10-20, option A): with `al2023@latest` it would let AMI drift force-kill Sonar. Drains of do-not-disrupt nodes are finished by hand
   - [ ] `KarpenterNodeStuckDraining` alert (taint `karpenter.sh/disrupted` > 1h) + promtool test *(gitops [#86](https://github.com/Beyric/plateng-gitops/pull/86) open)*; runbook section added
   - [ ] Before 2026-11-15 ~12:10 UTC: `ip-10-0-4-18` (redis-0) expires — expect the alert, finish the drain per runbook
+- [ ] Jenkins builds only `main`, `release/*` and PRs: `headWildcardFilter` `main release/* PR-*` in the `beyric` org folder *(gitops [#90](https://github.com/Beyric/plateng-gitops/pull/90) open; [SOP](../sop/2026-10-24-jenkins-branch-discovery.md))*: Train 1b's merge closed 5 PRs → 5 stale branch builds `#1` → main deploy stuck ~55 min on us-east-1b prefix space (2026-10-24)
+  - [x] Trait present on the live controller (scm-api 728, symbol `headWildcardFilter`); pre-commit green; rendered diff = jobs ConfigMap only, no restart
+  - [ ] Merged while no agent pod runs; folder config shows the filter; closed-PR branch jobs orphaned, `main` + PRs still build
+  - [ ] Separate: us-east-1b /28 prefix space (`InsufficientCidrBlocks`)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
