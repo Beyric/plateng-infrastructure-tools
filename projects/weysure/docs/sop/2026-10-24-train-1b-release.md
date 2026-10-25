@@ -64,8 +64,9 @@ Developers' own SOP: `Weysure-API/docs/sop/2026-10-21-train-1b-integration.md`. 
 
 ## Follow-ups
 
-- [ ] Devs: API Jenkinsfile `timeout(time: 90)` hotfix PR (own go) **before the next API merge**; `pytest-xdist` in Train 2
+- [x] Devs: API Jenkinsfile `timeout(time: 90)` hotfix — Weysure-API #124, live 2026-10-24 22:15 UTC (`73101c25b5eb`, gitops `a04a3c81`). `pytest-xdist` moved to CI-speed option B (after Train 2)
 - [ ] Loki rules on 1b's new lines (`refresh_token_reuse_detected`, `[DVA …]`, `[KYB]`, `[LIVE ACCESS]`, "no `[DVA RECONCILE]` > 30 min"), with decoys
-- [ ] MED-1 before any DVA flag-on; 1b LOWs in Train 2; `ACCESS_TOKEN_EXPIRE_MINUTES=15` only after web #59 live
+- [x] 1b LOWs a–e and the MED-1 start-up guard shipped in Train 2 (2026-10-25, [SOP](2026-10-25-train-2-release.md)); the DVA flag-on still needs the guard to count DEACTIVATED accounts
+- [ ] `ACCESS_TOKEN_EXPIRE_MINUTES=15` only after web #59 (in web Train 2) is live **and** the web refresh-scheduling MED-B is fixed
 - [ ] us-east-1b prefix space design (handoff §6 item 6)
-- [ ] Remove `api-scheduler` after Train 2
+- [ ] Remove `api-scheduler` (Train 1b and Train 2 API are live; unblocked)
