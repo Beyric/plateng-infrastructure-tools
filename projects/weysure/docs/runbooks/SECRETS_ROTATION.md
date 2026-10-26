@@ -74,7 +74,7 @@ printf 'NAME: '; read -rs V; echo; printf '{"NAME":"%s"}' "$V" | kubectl exec -n
 `kv patch` adds one key and leaves the others alone. `kv put` would replace the whole secret — never use it here.
 
 **What happens next, by itself:** External Secrets copies the new key into the Kubernetes Secret within
-an hour → Reloader sees the Secret change → `api` and `api-scheduler` do a rolling restart (old pods
+an hour → Reloader sees the Secret change → `api` and `api-worker` do a rolling restart (old pods
 serve until new ones are ready). To not wait the hour:
 `kubectl annotate externalsecret weysure-app-config -n weysure-prod force-sync=$(date +%s) --overwrite`.
 

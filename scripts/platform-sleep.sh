@@ -86,10 +86,10 @@ echo "[6/10] scale the application to 0 (PDBs would otherwise block the last evi
 # api-worker (2026-10-05) stops before RDS does: on SIGTERM it finishes its job, and
 # unstarted jobs go back to the queue. Only existing Deployments are named, so the
 # script also works on a cluster without one of them.
-APP_DEPLOYS=$(kubectl -n weysure-prod get deploy -o name | grep -E '/(api|api-scheduler|api-worker|web)$' || true)
+APP_DEPLOYS=$(kubectl -n weysure-prod get deploy -o name | grep -E '/(api|api-worker|web)$' || true)
 [[ -n "$APP_DEPLOYS" ]] && kubectl -n weysure-prod scale $APP_DEPLOYS --replicas=0
 kubectl -n weysure-prod scale statefulset redis --replicas=0
-kubectl -n weysure-prod wait --for=delete pod -l 'app.kubernetes.io/name in (api,api-scheduler,api-worker,web)' --timeout=5m || true
+kubectl -n weysure-prod wait --for=delete pod -l 'app.kubernetes.io/name in (api,api-worker,web)' --timeout=5m || true
 kubectl -n weysure-prod wait --for=delete pod/redis-0 --timeout=3m || true
 
 echo "[7/10] remove Karpenter's spot nodes (while Karpenter is still alive to terminate them)"
