@@ -67,7 +67,7 @@ Notes/replies (`weysure/docs/`): `platform-note-2026-10-25-train-2-api.md`, `pla
 
 ## Follow-ups
 
-- [ ] Web Train 2 (#66): changes requested (S3776 `apiRequest`, admin password `credentials: "include"`), flags-off live run, then GO
+- [x] Web Train 2 (#66) live 2026-10-26 09:14 UTC (`8d81d74c58c0`) — [SOP](2026-10-26-train-2-web-and-127-release.md)
 - [ ] DVA flag-on conditions: MED-1 guard counts DEACTIVATED accounts (or inflow stops crediting them); 1b MED-1
 - [ ] Web auth MED-B (refresh scheduling against the device clock) before `ACCESS_TOKEN_EXPIRE_MINUTES=15`
 - [ ] CI-speed B (pytest-xdist) PR; consider on-demand capacity for Jenkins agents
