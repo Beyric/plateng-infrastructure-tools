@@ -127,7 +127,9 @@ only from the configured CIDR (#66 + #72). Each blocks a different forgery path 
 | Commands (Adebayo) | `aws rds modify-db-instance … --no-deletion-protection --apply-immediately`, then `aws rds delete-db-instance … --final-db-snapshot-identifier weysure-postgres-final-2026-10-13` |
 | Verified | `describe-db-instances` → `DBInstanceNotFound`; `-v2` `available`, deletion protection on |
 
-Its automated backups were removed with it; the final snapshot is the only copy. Restore (if ever needed):
+> **Update 2026-10-26:** the final snapshot was **deleted** (Adebayo's decision: no further use; it also held `usage_logs` bodies that Weysure Train 3 purges from the live DB). Checked first: manual, unshared (`restore` attribute empty), not referenced by any Terraform `snapshot_identifier`. Verified: `describe-db-snapshots` → `DBSnapshotNotFound`. The restore command below no longer works.
+
+Its automated backups were removed with it; the final snapshot was the only copy. Restore (if ever needed):
 `aws rds restore-db-instance-from-db-snapshot --db-snapshot-identifier weysure-postgres-final-2026-10-13 …`.
 
 ## Follow-ups
@@ -135,4 +137,4 @@ Its automated backups were removed with it; the final snapshot is the only copy.
 - Developers: read `CF-Connecting-IP` only when the peer is in `10.0.0.0/16` — reply `weysure/docs/platform-reply-2026-10-12-client-ip.md`
   can be sent now. Checklist "Traefik honours `CF-Connecting-IP`" stays open until that app change ships.
 - Optional: NLB `preserve_client_ip` / proxy protocol so Traefik access logs see Cloudflare IPs instead of the NLB.
-- Decide whether to keep the final snapshot long-term (~$0.10/GB-month storage beyond the free backup allowance) or delete it after launch.
+- ~~Decide whether to keep the final snapshot long-term~~ — deleted 2026-10-26 (see §2 update).

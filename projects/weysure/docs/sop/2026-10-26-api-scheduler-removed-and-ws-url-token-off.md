@@ -53,6 +53,24 @@ probe -H "Sec-WebSocket-Protocol: weysure.bearer, $M-b" "$W?token=$M-b"  # expec
 probe -H "Sec-WebSocket-Protocol: weysure.bearer, $M-c" "$W"             # control: 403 "Invalid or expired token"
 ```
 
+## Follow-up done: Vault role trimmed (2026-10-26 ~14:05 UTC)
+
+`auth/kubernetes/role/weysure-api` `bound_service_account_names` went from `[api api-scheduler api-worker]` to `[api api-worker]`.
+Adebayo wrote every field back explicitly (copied from `vault read`, so nothing falls back to a default):
+
+```
+vault write auth/kubernetes/role/weysure-api bound_service_account_names=api,api-worker \
+  bound_service_account_namespaces=weysure-prod audience=https://kubernetes.default.svc \
+  alias_name_source=serviceaccount_uid token_policies=weysure-db-app token_ttl=1h token_max_ttl=24h
+```
+
+| Check | Result |
+|---|---|
+| `vault read` after | `[api api-worker]`; audience, alias source, namespace, policy, TTLs unchanged |
+| Fresh login (existing tokens prove nothing) | `rollout restart deploy/api-worker` → new pod `vault-agent`: `authentication successful` 14:05:59 UTC, `/vault/secrets/env` rendered, `[FLAGS]` logged, 0 errors |
+
+Roll back: the same `vault write` with `bound_service_account_names=api,api-scheduler,api-worker`.
+
 ## Operate / roll back
 
 - A refused handshake is an HTTP **403** on the upgrade (the server refuses before `accept`); the browser's `close` event shows **1006**.
@@ -61,5 +79,5 @@ probe -H "Sec-WebSocket-Protocol: weysure.bearer, $M-c" "$W"             # contr
 
 ## Follow-ups
 
-- [ ] Adebayo: trim `api-scheduler` from Vault `auth/kubernetes/role/weysure-api` `bound_service_account_names` (read the role first; `vault write` replaces every field)
+- [x] Adebayo: trim `api-scheduler` from Vault `auth/kubernetes/role/weysure-api` `bound_service_account_names` — done 2026-10-26 (section above)
 - [ ] Developers: drop "switch period" wording in `docs/fe-integration-guide-websockets.md`
