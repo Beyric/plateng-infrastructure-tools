@@ -108,11 +108,11 @@ prints, without needing the application image.
    `vault operator raft snapshot restore -force /tmp/vault.snap`.
 5. `vault status` → unsealed. Log in with your normal user.
 6. `kubectl rollout restart deploy/external-secrets -n external-secrets`, then restart `api` and
-   `api-scheduler` so they take fresh database credentials.
+   `api-worker` so they take fresh database credentials.
 7. Expect Vault to revoke leases that expired in the meantime. Here that is correct.
 
 ## Real recovery — database lost or corrupted  *(outline, not rehearsed)*
-1. Stop writes: scale `api` and `api-scheduler` to 0 (pause Argo first — [SLEEP_WAKE.md](SLEEP_WAKE.md)).
+1. Stop writes: scale `api` and `api-worker` to 0 (pause Argo first — [SLEEP_WAKE.md](SLEEP_WAKE.md)).
 2. Choose the time. Corruption: just **before** it happened (`--restore-time`). Loss: latest.
 3. Restore to `weysure-postgres-restored`; verify with the comparison Job.
 4. Rename old → `weysure-postgres-old`, restored → `weysure-postgres`. The endpoint name stays the
