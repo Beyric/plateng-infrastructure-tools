@@ -9,7 +9,7 @@ Notes/replies (`weysure/docs/`): `platform-note-2026-10-2x-train-3-web.md`, `pla
 `platform-reply-2026-10-27-web67-pr-merge-error.md`, `platform-reply-2026-10-29-web67-review-findings.md`,
 `platform-reply-2026-10-29-web67-train-3-web-go.md`, `platform-reply-2026-10-29-web67-train-3-web-live.md`.
 
-**Status: live; one proof pending** (a real signed-in session restoring from the refresh cookie, see Follow-ups). API half: [Train 3 API](2026-10-26-train-3-api-release.md). Method: [Train 2 web](2026-10-26-train-2-web-and-127-release.md).
+**Status: live and fully verified** (a real signed-in session restored from the refresh cookie at 18:48 UTC). API half: [Train 3 API](2026-10-26-train-3-api-release.md). Method: [Train 2 web](2026-10-26-train-2-web-and-127-release.md).
 
 ## Why it took three heads
 
@@ -49,7 +49,7 @@ B2 was checked against the API's live captures (`auth-refresh/28`, `29`): user a
 |---|---|---|
 | PR-67 #2 waited ~35 min for an agent pod (`Unschedulable: Insufficient cpu/memory`, then `ContainerCreating`; two pods timed out at 16.7 min each) | build queued 18:20, first stage ran ~18:55 | capacity / prefix-space work (checklist) |
 | Spot node `ip-10-0-4-48` (SonarQube, an API pod, a web pod) was **forcibly terminated** (events `Evicted: Forceful Termination`, about 18:20 UTC); `do-not-disrupt` does not stop spot reclaims | SonarQube restarted on another node; API pod `bdq7m` had 4 restarts (startup probes timing out, node at 101% memory — likely cause); worker 4 restarts, all exit 0 | pods rescheduled onto two nodes; keep watching |
-| A new spot node `ip-10-0-3-34` (nodeclaim `default-lz9xb`) never registered: `NotReady`, only Pending DaemonSet pods | Alloy 5/6 ready, `alloy` and `kube-prometheus-stack` show Progressing | delete the nodeclaim (Adebayo) |
+| A new spot node `ip-10-0-3-34` (nodeclaim `default-lz9xb`) never registered: `NotReady`, only Pending DaemonSet pods | Alloy 5/6 ready, `alloy` and `kube-prometheus-stack` show Progressing | cleared by Karpenter within the hour; nothing to do |
 | Argo `Degraded` ~1 min mid-roll | one Next.js startup-probe timeout | none; judge at the end |
 
 ## Verification (live, 2026-10-29)
@@ -62,7 +62,8 @@ B2 was checked against the API's live captures (`auth-refresh/28`, `29`): user a
 | `Referrer-Policy: no-referrer` | on `/verify-email/…`, `/reset-password/…`, `/settings/verify-bank-account/…`, `/developer/settings/verify-payout-change/…`, `/admin/set-password`; `/` keeps `strict-origin-when-cross-origin` |
 | Route guards (signed out) | `/developer`, `/dashboard` → 307 `/login?next=…`; `/admin/dashboard` → 307 `/admin/login`; the payout-change token path → **200, no redirect** |
 | Errors | 0 error/traceback lines in api, api-worker, web around the roll (SIGTERM excluded) |
-| Proof of life | one cookie-less `POST /auth/refresh` probe = 401, visible in API and Traefik logs; **no real `/auth/refresh` request** in the 25 min after the roll |
+| Proof of life | one cookie-less `POST /auth/refresh` probe = 401, visible in API and Traefik logs |
+| **Real session** | Adebayo signed in and reloaded private pages: `GET /dashboard` 18:48:08 → `POST /auth/refresh` **200** 18:48:11; `/dashboard/settings` → 200 at 18:48:28; `/dashboard/disputes` → 200 at 18:48:34 (870 bytes each); 0 responses with 429 and 0 errors 18:44–18:58. A 429 on refresh is "unavailable", never a sign-out: read in `lib/auth/session-refresh.ts` + unit tests, not seen live |
 
 Loki queries used (port-forward `svc/loki` in `monitoring`):
 
@@ -80,8 +81,8 @@ sum by (s) (count_over_time({namespace="traefik"} |= "auth/refresh" | regexp "\"
 
 ## Follow-ups
 
-- [ ] **Real-session proof:** a team test account signs in at `weysure.com`, reloads a private page and stays signed in; then Loki shows `POST /auth/refresh` 200 (Adebayo / developers).
-- [ ] Delete nodeclaim `default-lz9xb` (NotReady spot node, no workload).
+- [x] Real-session proof (2026-10-29 18:48 UTC, see Verification).
+- [x] Nodeclaim `default-lz9xb` (NotReady spot node, no workload): Karpenter removed it itself before the delete command ran (`NotFound`).
 - [ ] B3 API item (replay inside the refresh grace) if the developers want it.
 - [ ] Prod API/worker restarts from startup probes: decide on consolidation exemption / probe timeout.
 - [ ] Before `DEAL_INVITES_ENABLED`: invite option shown after a search miss with the flag off; "In escrow" excludes a buyer's held invite money.
