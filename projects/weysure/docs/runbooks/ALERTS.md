@@ -1,6 +1,6 @@
 # Runbook — alerts
 
-Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` (Prometheus) and `loki-rules-jobs.yaml` / `loki-rules-wallet.yaml` (Loki ruler, log-based) links here. Critical → `#beyric-alerts-critical`
+Every alert in `plateng-gitops/platform/monitoring/alerts.yaml` (Prometheus) and `loki-rules-jobs.yaml` / `loki-rules-wallet.yaml` / `loki-rules-autopause.yaml` (Loki ruler, log-based) links here. Critical → `#beyric-alerts-critical`
 (repeats every 4 h), warning → `#beyric-alerts-warning` (12 h). First move for anything red: `kubectl get app -n argocd`
 and the Grafana **Cluster overview** dashboard. Kubernetes-level alerts (KubePodCrashLooping, KubeJobFailed,
 KubeNodeNotReady, KubePersistentVolumeFillingUp) come from kube-prometheus-stack's defaults and follow the same channels.
@@ -227,6 +227,27 @@ Triage:
 4. Repeated `wallet reconciliation failed:` lines (ERROR with traceback): the run fails and requeues. Hand the traceback
    to the backend owner.
 
+## LiveKeysAutoPaused
+Warning, from the Loki ruler (gitops `platform/monitoring/loki-rules-autopause.yaml`): the worker's 15-minute sweep paused a
+developer's live keys (`[LIVE AUTO PAUSE] paused live keys of <id>`, `live_pause.py:126`; mode `enforce`). It is working as
+designed, but a pause stops a real customer's live payments, so an admin looks at it the same day.
+
+1. Loki: `` {namespace="weysure-prod", container=~"api|api-worker"} |= `[LIVE AUTO PAUSE]` `` — the line names the developer's id.
+   The rules are velocity, refund ratio and same payer; each ignores deals under the ₦5,000 floor.
+2. Read that developer's recent live deals in the admin console. Real abuse: leave the keys paused.
+   A false positive: a superadmin resumes the keys (`POST /admin/users/{id}/live-keys/resume`).
+3. Many pauses at once means a rule is too wide: set `LIVE_AUTO_PAUSE_MODE` to `shadow` (see
+   [the enforce SOP](../sop/2026-10-29-live-auto-pause-enforce.md)) and tell the developers.
+
+## LiveAutoPauseFailing
+Critical, same file: `[LIVE AUTO PAUSE] failed for …` (a pause could not be applied) or `[LIVE AUTO PAUSE] sweep failed` (the whole
+sweep errored). While this fires, nobody is being protected by the auto-pause.
+
+1. Loki, same query as above with `|~ "failed for|sweep failed"`; the line carries the exception class.
+2. `/admin/jobs/stats`: is `live.auto_pause_sweep` retrying or `dead`? A dead job is the second alert (`JobsDeadIncreased`).
+3. Usual causes: the database (locks, connection limit), a deploy in progress. If it persists past one sweep (15 min), ask the
+   developers to look; the failure line names the developer it could not pause.
+
 ## EKSEndOfStandardSupportApproaching
 Static reminder from 2027-06-03: Kubernetes 1.36 leaves standard support on 2027-08-02 and the control plane then bills
 at 6×. Run [EKS_UPGRADE.md](EKS_UPGRADE.md) one hop at a time before that date.
@@ -237,4 +258,4 @@ Prometheus, Alertmanager, Grafana or Blackbox is down. `kubectl -n monitoring ge
 one to notice by its absence (dead-man's switch: follow-up, healthchecks.io ping on Watchdog). If **Loki** is down, the
 log-based alerts (JobsQueueLagging, JobsDeadIncreased, JobsStatsMissing, WalletLotDrift, WithdrawalUnresolved,
 WithdrawalRefundedByRecheck, PaystackWebhookKeyMismatch, PaystackWebhookSignatureFailing,
-PaystackWebhookVerifyUnavailable, WalletReconciliationMissing) cannot fire either.
+PaystackWebhookVerifyUnavailable, WalletReconciliationMissing, LiveKeysAutoPaused, LiveAutoPauseFailing) cannot fire either.
