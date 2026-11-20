@@ -21,18 +21,16 @@ It runs the same chart, the same flags and the same API image as prod, on **test
 ```
 PR in Weysure-API / Weysure  ->  PR build (tests, Sonar, e2e)  ->  merge to main
    -> Jenkins on main: build, scan, push the image
-   -> Promote: stage/images.yaml first, then prod/images.yaml      (same push)
+   -> Promote: stage/images.yaml only (PROMOTE_TO_PROD=manual)
    -> Argo CD syncs weysure-api-stage / weysure-web-stage  -> migration runs on the STAGE database
    -> you check stage (smoke list below)
-   -> prod follows (automatically today, by hand once PROMOTE_TO_PROD=manual)
+   -> you promote prod: a gitops PR copying the stage tags to prod/images.yaml
 ```
 
-**Honest status of the gate.** Today `PROMOTE_TO_PROD` is `auto`: Jenkins writes the stage tag and, in the same push, the prod
-tag. Stage is then a *rehearsal that finishes a minute or two before prod*, not a gate: if you want to look before prod changes,
-you cannot. To make it a real gate, change `PROMOTE_TO_PROD = 'auto'` to `'manual'` in both Jenkinsfiles (one word each). Then
-Jenkins only promotes stage, and prod is promoted by a gitops PR that copies the tag from `stage/images.yaml`
-(the web tag minus `-stage`) after the smoke list is green. **Decision for Adebayo: when to flip it.** Recommended: before the
-live keys go into prod.
+**The gate.** `PROMOTE_TO_PROD` is `manual` in both Jenkinsfiles (decision of 2026-11-20: stage is a gate before live keys). Jenkins promotes **stage only**;
+prod is promoted by a plateng-gitops PR that sets `environments/prod/images.yaml` to the tag stage just ran (api: the same tag; web: the stage tag minus `-stage`),
+after the smoke list is green. Rollback of prod is unchanged (revert the commit). **Emergency prod deploy:** change `PROMOTE_TO_PROD = 'manual'` to `'auto'` in the
+`environment` block of the Jenkinsfile (the next main build then promotes stage and prod in one push), or edit prod's `images.yaml` directly.
 
 Web has **two images per commit**: `weysure-web:<sha12>` (prod, `NEXT_PUBLIC_API_URL=https://api.weysure.com/api/v1`) and
 `weysure-web:<sha12>-stage` (stage, `https://api-staging.weysure.com/api/v1`). The browser bundle bakes the API URL in at
@@ -245,9 +243,9 @@ kubectl -n weysure-stage logs job/db-bootstrap-v1 -c configure-vault-db-engine
 delete the Job (`kubectl -n weysure-stage delete job db-bootstrap-v1`) and let Argo re-create it. Nothing in Vault is half-written in a harmful way:
 the Job rewrites the same config and re-rotates.
 
-**Step 6 — merge the two Jenkinsfile PRs (`ci/promote-to-stage-first`), one at a time.** Weysure (web) first, then Weysure-API. Each merge starts a main build
-(about an hour; the web one builds twice). Afterwards `stage/images.yaml` carries the new tags, `weysure-web-stage` pulls
-`weysure-web:<sha12>-stage`, and prod is promoted as before. Until the gitops PR is merged, a missing stage file is skipped, so the merge order does not break CI.
+**Step 6 — merge the two Jenkinsfile PRs (`ci/promote-to-stage-first`), one at a time.** Weysure (web, PR 90) first, then Weysure-API. Each merge starts a main build
+(about an hour; the web one builds twice). Afterwards `stage/images.yaml` carries the new tags and `weysure-web-stage` pulls
+`weysure-web:<sha12>-stage`. **Prod no longer deploys by itself after these merges** (`manual`): see "The gate". Until the gitops PR is merged, a missing stage file is skipped, so the merge order does not break CI.
 Check: `curl -s https://api-staging.weysure.com/api/v1/health` from an allowed address (200), and `https://staging.weysure.com` loads.
 
 **Step 7 — Paystack dashboard (test mode).** Settings → API Keys & Webhooks → *Test* webhook URL =

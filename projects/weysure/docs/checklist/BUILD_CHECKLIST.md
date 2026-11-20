@@ -366,7 +366,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - [ ] Merge the two Jenkinsfile PRs; first `-stage` web image promoted
 - [ ] First admin on stage; Paystack test webhook pointed at stage
 - [ ] First full smoke list green on stage
-- [ ] Decide `PROMOTE_TO_PROD=manual`
+- [x] `PROMOTE_TO_PROD=manual` decided (2026-11-20); prod is promoted by a gitops PR after the stage smoke list
 
 ## Backlog — identified, not yet scheduled
 

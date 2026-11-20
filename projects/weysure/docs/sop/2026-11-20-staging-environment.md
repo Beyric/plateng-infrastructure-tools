@@ -22,7 +22,7 @@ Stage is a second copy that every change reaches first, on test keys, so a bad m
 | Access control in Cloudflare (WAF rule on the two hosts), not in Traefik | Traefik's access log shows only the NLB's private addresses (10.0.1.x / 10.0.2.x): the NLB does not preserve the client IP and Traefik trusts `X-Forwarded-For` only from Cloudflare ranges. An IP allow-list in the cluster would block everyone | Traefik `ipAllowList` (built, then dropped after reading the logs); Cloudflare Access with the `access-verify` middleware (needs per-app tags in `edge-auth` and CORS settings for the API) |
 | A separate web image per commit, `<sha12>-stage` | `NEXT_PUBLIC_API_URL` is baked in at build time; the prod image on stage would call `api.weysure.com` | One image for both (stage would hit the production API) |
 | One consolidated one-shot bootstrap Job (`db-bootstrap-v1`), plain Job, non-root | Prod needed three jobs over its history; stage starts empty. Kyverno is `Enforce` in stage too, so the Job must pass the baseline | Copying prod's retired hook Job (re-ran on every sync) |
-| Promote writes stage, then prod, in one push; `PROMOTE_TO_PROD` switch (`auto` today) | Keeps prod behaviour; flipping to `manual` is one word and makes stage a real gate | Making prod manual now (a policy change for Adebayo) |
+| Promote writes stage; `PROMOTE_TO_PROD` switch, default `manual` (Adebayo, 2026-11-20) | Stage is a real gate before live keys; `auto` (stage then prod in one push) is one word away for an emergency | Keeping prod automatic |
 
 ## What's involved
 
@@ -75,6 +75,5 @@ needs security groups for pods or an FQDN-aware policy: tracked below, accepted 
 - Developers: boot guard should refuse a live key in `PAYSTACK_LIVE_SECRET_KEY` too when `ENVIRONMENT=staging`.
 - Web: a visible STAGING banner and `robots` noindex need a code change (`NEXT_PUBLIC_ENV_LABEL`); not done (the web app has none today). Stage sends `X-Robots-Tag: noindex` from Traefik.
 - Alerts and a Blackbox probe for `weysure-stage` (prod's rules name `weysure-prod`).
-- Decide `PROMOTE_TO_PROD=manual` (recommended before live keys).
 - Authenticated Origin Pulls on the `weysure.com` zone (hardens prod and stage against other Cloudflare accounts).
 - Optional: stage CI e2e against the stage URL after each promotion.
