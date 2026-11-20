@@ -1,6 +1,7 @@
 # TLS and routing for the single-VPS layout. Caddy gets and renews Let's Encrypt certificates by itself:
 # DNS for WEB_DOMAIN, www.WEB_DOMAIN and API_DOMAIN must point at this server (DNS only / grey cloud) and
-# ports 80 and 443 must be open before the first start. Companion to ../VPS_MIGRATION.md.
+# ports 80 and 443 must be open before the first start. Create A records only, no AAAA (IPv6): the compose
+# file publishes IPv4 only, because Docker's IPv6 proxy would hide each client's real address. Companion to ../VPS_MIGRATION.md.
 {
 	email {$ACME_EMAIL}
 }

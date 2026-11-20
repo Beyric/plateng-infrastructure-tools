@@ -99,7 +99,8 @@ Add `--platform linux/amd64` when building on an ARM Mac for an x86 VPS. A rebui
 | `./app` bind-mounted over the image's code (the image never really runs) | removed: the image is what runs |
 | `build: .`, image `weysure-api:dev`, development reload switches | pinned `API_IMAGE` / `WEB_IMAGE` from `.env` |
 | Containers can write anywhere, run with default privileges | `read_only`, `/tmp` as tmpfs, `cap_drop: ALL`, `no-new-privileges` (as in the cluster) |
-| Client address trust: nothing (the app reads `CF-Connecting-IP` only from trusted peers) | fixed network `172.28.0.0/24`, Caddy at `172.28.0.10`, `TRUSTED_PROXY_CIDRS=172.28.0.10/32`; the Caddyfile overwrites the header with the real address |
+| Client address trust: nothing (the app reads `CF-Connecting-IP` only from trusted peers) | Caddy at the fixed address `172.28.0.10`, `TRUSTED_PROXY_CIDRS=172.28.0.10/32`; the Caddyfile overwrites the header with the real address. Ports are published on IPv4 only (Docker's IPv6 proxy would show every client as one gateway address): **create A records, no AAAA records** |
+| Everything on one flat network | two networks: `edge` (caddy, web, api, worker) and `backend` (api, worker, db, redis; `internal`, so db and redis have no route out or in). Redis has no password: only api and worker can reach it. Add `requirepass` if you ever put other containers on the host |
 | `DATABASE_URL` from a file | built from `POSTGRES_*` in `.env` |
 | Memory limits are tiny (api 512m) | api 1g, worker 512m, db 1g, web 512m (estimate, **not load-tested**) |
 | Both api and worker have no ordering against a database | worker waits for a healthy api; api waits for healthy db and redis |
@@ -161,7 +162,7 @@ Keep the same domains (`weysure.com`, `www`, `api.weysure.com`): then **no provi
 | 3 | | Final dump, **after** the freeze: `kubectl -n weysure-prod create job --from=cronjob/weysure-db-backup final-cutover-1`, then `kubectl -n weysure-prod logs job/final-cutover-1 -c upload-retain` must show `BACKUP_OK object=daily/weysure-<timestamp>.dump.age`. Note the name and the `sha256` |
 | 4 | | **Restore on the VPS.** On your Mac: download, decrypt there, stream into the VPS database over SSH, so the private key and the readable data never rest on the server (below) |
 | 5 | | On the VPS: `docker compose up -d db redis api worker web` (**not** caddy yet). Wait for `healthy`: `docker compose ps`. Check `docker compose logs api | tail`: migrations ran (no-op if the image is the one that ran on AWS) and gunicorn started. The API talks to the new database through `DATABASE_URL` from compose |
-| 6 | | Flip DNS in Cloudflare: `weysure.com`, `www` and `api` → the VPS IP (A records; **DNS only / grey cloud**: the Caddy layout assumes Cloudflare's proxy is off). Wait: `dig +short api.weysure.com @1.1.1.1` shows the VPS IP |
+| 6 | | Flip DNS in Cloudflare: `weysure.com`, `www` and `api` → the VPS IP (A records only, **delete any AAAA record**; **DNS only / grey cloud**: the Caddy layout assumes Cloudflare's proxy is off). Wait: `dig +short api.weysure.com @1.1.1.1` shows the VPS IP |
 | 7 | | `docker compose up -d caddy`. It gets both certificates within about a minute *(not proven)*. If it logged ACME errors before DNS caught up: `docker compose restart caddy` |
 | 8 | | **Verify (below) before anyone is told it is back** |
 | 9 | | Update the providers *only if something changed* (below), tell the developers the window is over |
@@ -183,6 +184,7 @@ Quick check: `ssh deploy@<vps-ip> "docker exec weysure_db psql -U weysure -d wey
 - A **test deal end to end** with test keys (create, pay in Paystack test mode, release): proves Paystack calls out *and* the webhook comes in. In the Paystack dashboard open the webhook log and confirm a delivery to `https://api.weysure.com/api/v1/wallet/paystack/webhook` answered 200.
 - Dojah: a KYC step reaches the widget; the Dojah webhook is `https://api.weysure.com/api/v1/kyc/dojah/webhook` (dashboard shows delivery).
 - A phone OTP arrives (Termii) and an email arrives (Resend; sender domain unchanged).
+- Real client address: open the site from your phone on mobile data, then `docker compose logs --tail 20 caddy` must show your phone's public address as the client, **not** `172.28.0.1`; if you see the gateway address the rate limits would treat everyone as one person.
 - `docker compose ps`: every service `healthy`, the worker too (its heartbeat file is checked); `docker compose logs --tail 50 worker` shows `jobs_stats` lines.
 - Run the first backup by hand: `/opt/weysure/backup.sh` → `BACKUP_OK`, and the file is in Drive (step 8 of the setup below).
 
@@ -224,7 +226,7 @@ Evidence log: [evidence/2026-11-20-vps-migration-proof.txt](../evidence/2026-11-
 | A dump made the way the cluster makes it, encrypted, decrypted with the private key, restored into the **`db` service of this compose file** (plain Postgres 16, owner `weysure`, `--no-owner`): 13/13 checks identical to the source (row counts and content hash of every table, sequences, indexes, constraints, columns, enum, view) | **proven locally** |
 | `vps/backup.sh` against that container, unmodified: encrypts, uploads (rclone local backend), verifies size + MD5, monthly keeper, retention, temp files removed; the object restores into a third empty database, 13/13 identical; refuses a private key as recipient; fails cleanly with the db container missing | **proven locally** |
 | `docker compose config` on `vps/docker-compose.yaml` (valid, required variables enforced); `caddy validate` on the `Caddyfile`; `shellcheck` on `backup.sh` | **proven** |
-| The `db` service starts healthy with `cap_drop: ALL` plus the capabilities its entrypoint needs | **proven locally** |
+| The `db` service starts healthy with `cap_drop: ALL` plus the capabilities its entrypoint needs (tested on a single flat network, **before** the later split into `edge` / `backend`; the split, the IPv4-only ports and which service sits on which network were checked with `docker compose config` only) | **proven locally**, split **config-checked only** |
 | The api, worker, web and caddy containers running together; `read_only` + `tmpfs` being enough for api/web/worker; the web health check; migrations at boot on a restored database; Caddy issuing certificates; Cloudflare grey-cloud flip; firewall and SSH hardening steps; the ECR copy (needs your AWS login); real Drive upload; provider dashboards; the sizing | **not proven** — the rehearsal (step 6) is where they get proven |
 | Rollback after real writes on the VPS | **not designed in detail, not rehearsed** |
 | A "Cloudflare proxy on" variant | **not written**: Caddy would have to stop overwriting `CF-Connecting-IP`, and ports 80/443 be limited to Cloudflare's published ranges, or a caller could pick its own rate-limit bucket |

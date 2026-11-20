@@ -16,10 +16,11 @@ Adebayo wants to be able to leave AWS for a plain VPS at any time (2026-11-20), 
 |---|---|---|
 | Layout | Docker Compose on one VPS: Caddy, api, worker, web, Postgres 16, Redis | Kubernetes on a VPS (k3s): far more to run for one small app; a managed Postgres is allowed but not assumed |
 | TLS / edge | Caddy with automatic Let's Encrypt, DNS **only** (Cloudflare proxy off) | Cloudflare proxy on: needs the client-IP header left alone and ports limited to Cloudflare's ranges (the API trusts `CF-Connecting-IP` from a trusted peer); listed as not written |
-| Client address | fixed compose network, Caddy at `172.28.0.10`, `TRUSTED_PROXY_CIDRS=172.28.0.10/32`, Caddy overwrites `CF-Connecting-IP` with the real peer | trusting the whole network, or leaving the header: a caller could choose its own rate-limit bucket |
+| Client address | Caddy at fixed `172.28.0.10` on the `edge` network, IPv4-only published ports (no AAAA records: Docker's IPv6 proxy hides the client), `TRUSTED_PROXY_CIDRS=172.28.0.10/32`, Caddy overwrites `CF-Connecting-IP` with the real peer | trusting the whole network, or leaving the header: a caller could choose its own rate-limit bucket |
 | Database restore | `pg_restore --no-owner --no-privileges` into the compose `db`, owner `weysure`; decrypt on the Mac and stream over SSH | putting the age private key on the server (it must never be there) |
 | Images | out of ECR via the Mac (`docker save`), or rebuild; web needs the `NEXT_PUBLIC_*` build args | an AWS login on the VPS |
 | Domains | keep them: then no webhook URL, CORS, cookie or passkey change | changing domain at the same time (passkeys break; separate step) |
+| Networks | `edge` (caddy, web, api, worker) + `backend` (`internal: true`: api, worker, db, redis); no Redis password | one flat network; a Redis password (only api/worker can reach it; revisit if other containers share the host) |
 | Cutover order | freeze AWS, final dump, restore, start everything but Caddy, flip DNS, then start Caddy | flipping DNS first (certificate has nothing to answer; more downtime) |
 | Backups on the VPS | `backup.sh`: same recipe as the CronJob (age, Drive, verify, 30 daily + 12 monthly, optional ping) | none was the starting point |
 
