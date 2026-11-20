@@ -247,7 +247,7 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] Proven locally: role, `pg_dump | age`, restore into a fresh Postgres 16 (16/16 identical), retention, failure cases, alert (promtool)
   - [x] Owner steps done 2026-11-20: age key pair, Google OAuth client + `rclone config` (local remote `gdrive_w`), `vault kv put secret/weysure/backup` (5 keys)
   - [x] Merged and live; first manual run `BACKUP_OK` 2026-11-20 20:42 UTC (293,501 bytes, `daily/` + monthly keeper, size and MD5 verified on Drive)
-  - [x] First real restore test from Drive with the private key 2026-11-20 21:5x WAT: 72 tables, 5 users, `alembic_version` `c9e1f3a5b7d2`. Repeat quarterly
+  - [x] First real restore test from Drive with the private key 2026-11-20 ~21:53 WAT: 72 tables, 5 users, `alembic_version` `c9e1f3a5b7d2`. Repeat quarterly
   - [ ] Confirm `WeysureDbBackupMissing` reaches Slack (never seen firing); next scheduled run 02:30 UTC (03:30 WAT) to be seen succeeding on its own
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [x] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
