@@ -1,0 +1,93 @@
+# Proof run 2026-11-20 - nightly off-AWS database backup (gitops PR #108)
+# Scripts extracted verbatim from the gitops manifests; images postgres:16.16-alpine3.23 and rclone/rclone:1.75.2 (pinned digests),
+# run non-root, read-only rootfs, cap-drop ALL. Throwaway Postgres 16 containers (removed afterwards), throwaway age key.
+# Test-only differences: PGSSLMODE=disable (no TLS on the throwaway server) and rclone remote type=local (no Google access).
+
+=== 1. role Job (db-backup-role-v1) on a prod-like layout: run 1 ===
+ public_tables_readable | public_sequences_readable | has_elevated_attributes
+------------------------+---------------------------+-------------------------
+                      6 |                         3 | f
+(1 row)
+
+login-ok user=weysure_backup read_only=on
+backup role ready: weysure_backup (read-only)
+
+=== 2. role Job: negative (table the master cannot grant on) / short password / idempotent re-run / future table / read-only ===
+psql:/scratch/backup-role.sql:14: ERROR:  permission denied for table t_bad          (Job fails loudly)
+PGPASSWORD in Vault secret/weysure/backup is missing or shorter than 24 characters    (Job refuses)
+login-ok user=weysure_backup read_only=on
+backup role ready: weysure_backup (read-only)                                         (run 2: idempotent)
+backup role reads late_table: 300                                                     (table created by weysure_owner AFTER the Job)
+ERROR:  cannot execute CREATE TABLE in a read-only transaction
+ERROR:  permission denied for table users                                             (UPDATE refused even with read-only GUC switched off)
+
+=== 3. stage 1 (dump-encrypt.sh), night 1 ===
+dumping database=weysure host=wsy-proof-pg tables=7 -> weysure-2026-11-20T111053Z.dump.age
+DUMP_OK object=weysure-2026-11-20T111053Z.dump.age bytes=1196510 tables=7
+exit=0
+header: age-encryption.org/v1 ; plaintext markers (user5@example.test / CREATE TABLE / PGDMP) found in ciphertext: 0
+
+=== 4. stage 2 (upload-retain.sh), night 1, seeded old files ===
+BEFORE  daily:   notes-from-adebayo.txt, weysure-2026-10-10..., weysure-2026-10-20..., weysure-2026-11-01...
+        monthly: weysure-2025-09-01..., weysure-2025-11-01..., weysure-2026-06-01...
+monthly keeper stored: weysure-2026-11-20T111053Z.dump.age
+BACKUP_OK object=daily/weysure-2026-11-20T111053Z.dump.age bytes=1196510 sha256=4249d5a4e90e09705383cd85300b665515e32523520ec8d170f4f64eb70e4012 md5=edcf0658c5e413018357da13abfccbde daily_kept=2 monthly_kept=2
+exit=0
+AFTER   daily:   notes-from-adebayo.txt, weysure-2026-11-01..., weysure-2026-11-20T111053Z...      (41 d and 31 d deleted, 19 d kept, stray file kept)
+        monthly: weysure-2026-06-01..., weysure-2026-11-20T111053Z...                              (430 d and 380 d deleted, 172 d kept, new monthly keeper)
+
+=== 5. night 2 + failure cases ===
+######## NIGHT 2 (same month: expect NO second monthly copy) ########
+DUMP_OK object=weysure-2026-11-20T111214Z.dump.age bytes=1196510 tables=7
+exit=0
+BACKUP_OK object=daily/weysure-2026-11-20T111214Z.dump.age bytes=1196510 sha256=afa074ce1d7ab47b9427eef072864f42bc9576a77b224b0dfd1aeb03ae0766ee md5=7c62b9c0a41f21be21827b48fd8f5bac daily_kept=3 monthly_kept=2
+exit=0
+
+######## NEGATIVE 1: private key pasted as the recipient ########
+BACKUP_FAILED stage=dump-encrypt reason=AGE_RECIPIENT-is-not-an-age-public-key-(must-start-with-age1)
+exit=1
+######## NEGATIVE 2: wrong database password ########
+BACKUP_FAILED stage=dump-encrypt reason=database-unreachable
+exit=1
+object-name written: 0   finished .dump.age files: 0
+######## NEGATIVE 3: age download checksum does not match (tampered binary) ########
+BACKUP_FAILED stage=dump-encrypt reason=age-sha256-mismatch
+exit=1
+######## NEGATIVE 4: Drive auth broken (expired token, no network route to Google from this proof) -> stage 2 must exit non-zero, no OK line ########
+2026/11/20 11:13:10 NOTICE: gdrive{Ahj2m}: This remote uses rclone's shared Google Drive client_id, which is being retired and will stop working during 2026. Create your own client_id to avoid interruption: https://rclone.org/drive/#making-your-own-client-id
+2026/11/20 11:13:10 CRITICAL: Failed to create file system for "gdrive:/drive/weysure-db-backups/daily": couldn't find root directory ID: Get "https://www.googleapis.com/drive/v3/files/root?alt=json&fields=id&prettyPrint=false&supportsAllDrives=true": couldn't fetch token: invalid_grant: maybe token expired? - try refreshing with "rclone config reconnect gdrive{Ahj2m}:"
+BACKUP_FAILED stage=upload-retain reason=drive-mkdir-daily
+exit=1
+
+=== 6. restore: newest object -> age -d (private key) -> pg_restore into a SEPARATE fresh Postgres 16 ===
+restoring: weysure-2026-11-20T111214Z.dump.age ( 1196510 bytes)
+pg_restore finished OK
+---- source report (identical to restored report) ----
+columns | 30 md5=d14d54a460cc0c1a1a7e962ee7e03d38
+constraints | 11 md5=4854fe9f338ea4d15d137d8b4edc84c7
+enum deal_status | pending,funded,released,refunded
+indexes | 9 md5=04a78e74d2aa9ecb09316f201b4aea6d
+sequence invoice_no_seq | last_value=4242
+sequence late_table_id_seq | last_value=300
+sequence ledger_id_seq | last_value=50000
+sequence users_id_seq | last_value=5000
+table alembic_version | 1 rows  md5=4ebe9fbf9cb6c0ee223fc87d177500e3
+table deals | 20000 rows  md5=9998e77f7ac17d2bd03d60f49ed2886e
+table empty_table | 0 rows  md5=-
+table late_table | 300 rows  md5=37161a9da0abc94a829efd0419197d76
+table ledger | 50000 rows  md5=accf369d7374c2ed7a2938f0e4a7a44c
+table users | 5000 rows  md5=5d181a3bc9a533d8ee19671115f1bcfe
+table wallets | 5000 rows  md5=ba219333cf1833491b249fe08bf6b164
+view funded_deals | c02968146a272f33ee7f3dfd3933c444
+IDENTICAL: 16 checks match
+
+=== 7. wrong private key ===
+age: error: no identity matched any of the recipients
+
+=== 8. repo checks ===
+pre-commit --all-files: gitleaks, no-plaintext-secrets, merge-conflict, eof, whitespace, check-yaml, detect-private-key: all Passed
+kubeconform -strict (k8s 1.34): 15 resources in 6 files - Valid: 14, Invalid: 0, Errors: 0, Skipped: 1 (ExternalSecret CRD)
+kyverno-cli v1.19.1 (cluster version) apply platform/kyverno to CronJob + role Job: pass: 18, fail: 0
+platform/monitoring/tests/prometheus-rules-test.sh (promtool v3.14.0): SUCCESS 22 rules; prometheus-rules-test OK
+
+=== not exercised: real Google Drive upload, real RDS role Job, live admission/ESO/Argo, Slack delivery ===

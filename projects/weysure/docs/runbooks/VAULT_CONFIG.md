@@ -22,8 +22,9 @@ record. Log in first: `kubectl exec -n vault -it vault-0 -- vault login -method=
 | db role `weysure-migrate` | `… IN ROLE weysure_owner; ALTER ROLE "{{name}}" SET role = 'weysure_owner'`; ttl 30m, max 1h |
 | kv `secret/platform/healthchecks` | `api_key` - read-write project key, read by `scripts/platform-sleep.sh` only (not synced into the cluster) |
 | kv `secret/weysure/prod` | 15 application keys (names in the Phase 7 SOP) |
+| kv `secret/weysure/backup` | 5 keys for the nightly off-AWS backup (gitops #108): `PGPASSWORD` (role `weysure_backup`), `AGE_RECIPIENT` (age public key), `RCLONE_CONFIG_GDRIVE_CLIENT_ID` / `_CLIENT_SECRET` / `_TOKEN`. One consumer: ExternalSecret `weysure-backup`. [DB_OFFSITE_BACKUP.md](DB_OFFSITE_BACKUP.md) |
 
-Postgres groups `weysure_owner` / `weysure_app` were created by gitops `db-grants-v2` (as master,
+Postgres role `weysure_backup` (LOGIN, read-only, for the nightly backup) is created by gitops `db-backup-role-v1`. Postgres groups `weysure_owner` / `weysure_app` were created by gitops `db-grants-v2` (as master,
 `SET ROLE vault`, `createrole_self_grant = 'set, inherit'`).
 
 Read-only checks: `vault policy list` · `vault list auth/kubernetes/role` · `vault read

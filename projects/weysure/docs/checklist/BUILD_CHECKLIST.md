@@ -242,6 +242,12 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `drill-rds-restore.sh` — comparison tested on local Postgres 16 (5 cases); Job accepted by the API server and Kyverno (dry run)
   - [x] **Vault drill run on the production snapshot: PASS, 41 s** *(2026-09-29)*
   - [x] **RDS drill run: PASS, RPO 261 s, RTO 13 min** *(2026-09-29)*
+- [ ] 5b · Nightly encrypted off-AWS database backup to Google Drive *(gitops [#108](https://github.com/Beyric/plateng-gitops/pull/108), 2026-11-20; [runbook](../runbooks/DB_OFFSITE_BACKUP.md), [SOP](../sop/2026-11-20-db-offsite-backup.md))*
+  - [x] CronJob + read-only role Job + ExternalSecret + NetworkPolicy + `WeysureDbBackupMissing`; PR open, not merged
+  - [x] Proven locally: role, `pg_dump | age`, restore into a fresh Postgres 16 (16/16 identical), retention, failure cases, alert (promtool)
+  - [ ] Owner steps: age key pair, Google OAuth client + `rclone config`, `vault kv put secret/weysure/backup`
+  - [ ] Merged and live; first manual run `BACKUP_OK`; file visible in Drive
+  - [ ] First real restore test from Drive with the private key
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [x] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
   - [x] real Access token accepted *(156 requests 200/304 with real tokens, 2026-10-02)*
