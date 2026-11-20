@@ -199,13 +199,16 @@ Lifecycle policy on `weysure-api` and `weysure-web` (`terraform/main.tf`, `aws_e
 | main builds (gitops promotes only these) | 12-hex SHA, `0dd54eb1e601` | forever |
 | PR / branch builds | `<job>-<sha12>-b<build>`, `pr-36-e69947ea37af-b1` | 7 days (`*-b*`) |
 | untagged | none | 7 days |
-| Kaniko build cache | 64-hex | **forever: not covered** |
+| Kaniko build cache | 64-hex | **forever from the lifecycle policy**; pruned by hand with `scripts/ecr-prune.sh` (14 days) |
 
 ECR rules have no regex, only prefixes and `*`, so "not a 12-hex SHA" is written as `*-b*`
 (a SHA has no hyphen). The cache shares the repo (`--cache-repo $ECR/$IMAGE` in both
 Jenkinsfiles) and no wildcard separates 64-hex from 12-hex. Fix when it matters: a separate
 `<repo>-cache` repository with an "any, 7 days" rule (needs a Jenkinsfile change and Jenkins
 push access). 2026-10-03: cache was 0.9 GB (api) + 3.8 GB (web), about $0.50/mo.
+2026-11-20: 867 + 290 cache images, ECR $3.46 / 30 d. `scripts/ecr-prune.sh` (dry run by default) deletes cache layers older than
+14 days and main builds outside the newest 30, anything gitops references, the previous 10 promoted and what pods run; a lifecycle
+rule cannot express that exemption. See [the 2026-11-20 SOP](../sop/2026-11-20-aws-cost-trims.md).
 
 Check a rule before applying it, with ECR's dry run (deletes nothing, does not change the policy):
 
@@ -226,7 +229,8 @@ selects by count and lists every image the pattern matches.
 1. **Cost Explorer → Group by Service** — find which service moved.
 2. Common causes, in order of likelihood:
    - **NAT Gateway data processing** — a workload pulling large images repeatedly, or egress
-     that should be going through the S3 gateway endpoint.
+     that should be going through the S3 gateway endpoint (the endpoint exists since 2026-08-31;
+     measured 2026-11-20: about 190 GB / $8.45 a month, mostly build-day downloads).
    - **Karpenter provisioned more than expected** — check `kubectl get nodeclaims` and the
      NodePool limits. A pod with an unsatisfiable request can drive continuous provisioning.
    - **EBS volumes orphaned by deleted PVCs** — check for `available` volumes.
