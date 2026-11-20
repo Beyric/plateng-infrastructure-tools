@@ -338,6 +338,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays). **Reversed 2026-10-13 for api/web (ADR-024).**
 - [x] 10 · SOP [2026-09-29-phase-10-hardening-dr](../sop/2026-09-29-phase-10-hardening-dr.md) · overview · checklist *(2026-09-30; wake + verifier attach stay open above)* · ADR-023 scope freeze
 
+- [ ] **Production data reset before live keys** (keep only the owner's admin `beyrichq@gmail.com`; 2026-11-20) *([runbook](../runbooks/PROD_DATA_RESET.md), [SOP](../sop/2026-11-20-prod-data-reset.md), [evidence](../evidence/2026-11-20-prod-data-reset-proof.txt); gitops [#110](https://github.com/Beyric/plateng-gitops/pull/110))*
+  - [x] 72 tables classified (6 keep, 3 owner, 1 audit, 62 wipe); guarded one-transaction SQL, `DRY_RUN` default, idempotent; gitops Job **outside Argo's synced path** + `scripts/db-reset-prod.sh` gate (snapshot, off-AWS backup, prior dry run, type `RESET`)
+  - [x] Proven locally on postgres:16 against the real schema (head `c9e1f3a5b7d2`): 98 checks: dry run, real run, second run no-op, 14 guard refusals, owner password + TOTP sign-in on the wiped database, new signup; Kyverno CLI 9/9, kubeconform valid
+  - [ ] Owner answers the SOP questions (test-edited settings kept? other admins? old audit logs?)
+  - [ ] RDS snapshot `available` + first off-AWS backup (`BACKUP_OK`)
+  - [ ] Dry run read by the owner, real run committed, `api-worker` restarted, after-checks done
+  - [ ] Cloudinary `weysure/` test uploads deleted; pre-reset snapshot and Drive dump deleted after 30 days
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
 - [ ] SLOs and error budgets defined
 - [ ] Load test; capacity re-derived from real numbers
