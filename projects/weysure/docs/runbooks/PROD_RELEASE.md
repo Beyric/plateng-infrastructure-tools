@@ -1,6 +1,7 @@
 # Runbook — production release
 
-There is no manual release step. A merge to `main` in `Weysure-API` or `Weysure` **is** the release:
+There is no manual release step. A merge to `main` in `Weysure-API` or `Weysure` **is** the release (since the staging environment, it
+reaches **stage first**: Jenkins writes `environments/stage/images.yaml`, then prod's, in one push; see [STAGING_ENVIRONMENT.md](STAGING_ENVIRONMENT.md)):
 
 1. Jenkins (org folder `beyric`) builds `main`: gitleaks → tests (+coverage) → SonarQube gate → Kaniko →
    Trivy (CRITICAL blocks) → push `ecr/<repo>:<git-sha>` → commit the tag to
