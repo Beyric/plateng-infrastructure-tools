@@ -90,6 +90,10 @@ If the script is interrupted, run it again: it finds the instance and continues.
 The schema version is read from the `alembic_version` table — the same value `alembic current`
 prints, without needing the application image.
 
+## Third copy: off-AWS (Google Drive)
+Since 2026-11-20 (gitops #108) a nightly encrypted `pg_dump` also goes to the owner's Google Drive, readable only with his age key. It covers loss of the
+AWS account or a move to another cloud, which neither drill above does. Its restore test is in [DB_OFFSITE_BACKUP.md](DB_OFFSITE_BACKUP.md); run it on the same quarterly schedule.
+
 ## What the drill does not prove
 | Not proven | Why | Covered by |
 |---|---|---|

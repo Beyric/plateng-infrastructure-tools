@@ -65,6 +65,14 @@ sleep longer than a day - the wake script starts a snapshot. Run one now:
 `kubectl create job -n vault --from=cronjob/vault-snapshot vault-snapshot-manual-$(date +%s)`. Delete failed Jobs
 afterwards or `KubeJobFailed` fires.
 
+## WeysureDbBackupMissing
+No successful run of CronJob `weysure-prod/weysure-db-backup` (02:30 UTC) in 26 h, so the newest copy outside AWS is more than a day old
+(RDS's own snapshots are unaffected). `kubectl -n weysure-prod get cronjob,job`, then `kubectl -n weysure-prod logs job/<name> -c dump-encrypt`
+and `-c upload-retain`: the line `BACKUP_FAILED stage=… reason=…` names the step. Causes and fixes: [DB_OFFSITE_BACKUP.md](DB_OFFSITE_BACKUP.md#when-something-is-wrong)
+(expired Google login = `invalid_grant`; wrong `age1…` value; new table the read-only role cannot read). Pod stuck `CreateContainerConfigError` = a key missing in
+Vault `secret/weysure/backup` (`ExternalSecretNotReady` fires too). Run one now: `kubectl -n weysure-prod create job --from=cronjob/weysure-db-backup weysure-db-backup-manual-$(date +%s)`;
+delete failed Jobs afterwards or `KubeJobFailed` fires. Before the very first run the alert stays quiet for 26 h after the CronJob was created.
+
 ## ArgoAppDegraded
 `kubectl get app <name> -n argocd -o yaml | grep -A5 conditions`; Degraded = a workload it owns is unhealthy (see the
 pod), Missing = a resource was deleted out from under it (a sync recreates it).
