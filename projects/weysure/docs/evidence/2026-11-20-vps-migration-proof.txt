@@ -1,0 +1,39 @@
+# Proof run 2026-11-20 - VPS migration runbook (files under runbooks/vps/)
+# Throwaway containers only (removed afterwards). Source = a Postgres 16 laid out like prod (tables owned by weysure_owner).
+# Target = ONLY the 'db' service of runbooks/vps/docker-compose.yaml (postgres:16.16-alpine3.23, cap_drop ALL + the caps its entrypoint needs).
+# The toolbox container (alpine 3.23: age 1.2.1, rclone, docker CLI) plays the VPS host; Google Drive is replaced by rclone's local backend.
+
+=== docker compose config (compose v2.40.3, env copied from env.example) ===
+docker compose config -q: OK; services: db redis api worker web caddy; required-variable check fires when .env lacks API_IMAGE (error: required variable API_IMAGE is missing a value)
+caddy validate (caddy 2.11.8-alpine, Caddyfile as shipped): Valid configuration
+shellcheck backup.sh: no findings
+
+=== restore + backup.sh ===
+1.2.1
+rclone v1.72.1-DEV
+### 1. dump the AWS-like source exactly as the cluster does, encrypt, then restore into the VPS compose db (owner weysure, --no-owner)
+encrypted dump: 358578 bytes, header: age-encryption.org/v1
+pg_restore into weysure_db finished OK
+RESTORE 1 IDENTICAL: 13 checks match
+table owners on VPS: weysure
+### 2. backup.sh (from the runbook, unmodified) against the VPS db container, rclone remote = local folder
+monthly keeper stored: weysure-2026-11-20T113029Z.dump.age
+BACKUP_OK object=daily/weysure-2026-11-20T113029Z.dump.age bytes=358377 sha256=d0a173b5968f483f75038b756301451b8a06cea70e75d70011c9e7090576ab68 md5=71c9b838fdc0e2b270cbd05e09a0d4ff tables=6 daily_kept=2 monthly_kept=1
+--- after: ---
+/w/drive/weysure-db-backups/daily:
+weysure-2026-10-01T023000Z.dump.age
+weysure-2026-11-20T113029Z.dump.age
+
+/w/drive/weysure-db-backups/monthly:
+weysure-2026-11-20T113029Z.dump.age
+temp dirs left in BACKUP_DIR: 0
+### 3. restore the backup.sh object into a THIRD empty database and compare
+RESTORE 2 IDENTICAL: 13 checks match
+### 4. negative: backup.sh with a private key in age-recipient.txt, and with the db container missing
+BACKUP_FAILED reason=age-recipient-is-not-an-age1-public-key
+exit=1
+Error response from daemon: No such container: nope
+BACKUP_FAILED reason=database-unreachable
+exit=1
+
+=== not exercised: full stack (api/worker/web/caddy up), real ECR pull, ACME certificate, real Drive, a real VPS, firewall, DNS ===

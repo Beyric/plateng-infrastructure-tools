@@ -259,6 +259,10 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] node `ip-10-0-4-83` replaced; `subnet-blocks.sh`: 8 free blocks in 1a, 3 in 1b; address errors stopped 12:27 UTC
 - [x] Finding ㊺ written up: [VPC_CNI_MODE_CHANGE.md](../runbooks/VPC_CNI_MODE_CHANGE.md), with incident record *(2026-09-28)*
 - [x] Developer handover items 1 and 3 closed: `/tmp` only, migration Job without app secrets *(gitops #55, 2026-10-01)*
+- [ ] "Move to one plain VPS" runbook *(2026-11-20; [runbook](../runbooks/VPS_MIGRATION.md), [SOP](../sop/2026-11-20-vps-migration-runbook.md), files in `runbooks/vps/`)*
+  - [x] Runbook, compose file, Caddyfile, env names, VPS backup script written; docs PR open
+  - [x] Proven locally: restore into the compose `db` service (13/13 identical), `backup.sh`, `compose config`, `caddy validate`
+  - [ ] Rehearsal on a real VPS (full stack, certificates, health checks): **not done**
 - [x] KYC secrets for the developers' phases 2–3 *(developer note 2026-10-02)*
   - [x] `KYC_FINGERPRINT_KEY` generated in Vault, snapshot taken, break-glass copy in Secrets Manager *(infra #45)*
   - [x] `TERMII_API_KEY`, `DOJAH_API_KEY`, `DOJAH_WEBHOOK_SECRET` in Vault *(verified in the pod by length, 2026-10-02)*
