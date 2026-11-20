@@ -57,7 +57,17 @@ Stage is a second copy that every change reaches first, on test keys, so a bad m
 Runbook: [`runbooks/STAGING_ENVIRONMENT.md`](../runbooks/STAGING_ENVIRONMENT.md) (steps, smoke list, reset, rollback, cost). Remove: delete the three Applications' files and the stage directory
 in gitops, then turn off deletion protection and destroy `module.rds_stage` (human).
 
+## Known limitation: stage can reach prod's database port
+
+Both RDS security groups admit the **shared node security group**, and stage's `api-egress` policy (a copy of prod's) allows TCP 5432 to the whole VPC `10.0.0.0/16`.
+A compromised stage pod could therefore open a connection to the production database. It could not log in: the stage pods hold no prod credential (their Vault roles
+`weysure-stage-*` mint users on the stage database only, `weysure/stage` carries no prod value, and the stage pod-identity role reads only the stage master secret). Both
+instances sit in the same private subnets, so a CIDR rule cannot tell them apart, and a `/32` for the stage instance would break whenever AWS moves it. Proper separation
+needs security groups for pods or an FQDN-aware policy: tracked below, accepted for a test-data environment.
+
 ## Follow-ups
+
+- Separate stage from prod at the network layer (security groups for pods, or an FQDN-aware egress policy), see the limitation above.
 
 - Developers: boot guard should refuse a live key in `PAYSTACK_LIVE_SECRET_KEY` too when `ENVIRONMENT=staging`.
 - Web: a visible STAGING banner and `robots` noindex need a code change (`NEXT_PUBLIC_ENV_LABEL`); not done (the web app has none today). Stage sends `X-Robots-Tag: noindex` from Traefik.
