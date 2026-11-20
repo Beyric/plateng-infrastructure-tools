@@ -67,6 +67,9 @@ needs security groups for pods or an FQDN-aware policy: tracked below, accepted 
 
 ## Follow-ups
 
+- Secret store scope: the shared `vault` ClusterSecretStore lets any namespace read any `secret/weysure/*` path (ESO role `external-secrets`), so a stage ExternalSecret could name `weysure/prod`. Existing property of the cluster; fix with per-namespace store conditions or a store per environment.
+- Cookie tossing: stage is a sibling subdomain of weysure.com. Prod's `__Host-` cookies cannot be set from a subdomain; the old-name fallback (dropped 2026-12-15) can. A separate registrable domain for stage removes the question.
+- Origin access: only the Cloudflare rule gates stage. Authenticated Origin Pulls (or Cloudflare Access + `access-verify`) would enforce it at the origin too.
 - Separate stage from prod at the network layer (security groups for pods, or an FQDN-aware egress policy), see the limitation above.
 
 - Developers: boot guard should refuse a live key in `PAYSTACK_LIVE_SECRET_KEY` too when `ENVIRONMENT=staging`.
