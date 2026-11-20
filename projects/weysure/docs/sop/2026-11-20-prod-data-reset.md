@@ -34,12 +34,14 @@ except `kyc_tier_limits`, `risk_hold_settings` (cleared first, above) and the au
 |---|---|---|---|
 | 1 | **Sessions and refresh tokens are wiped, including yours.** You sign in again after the reset | a deleted user's token could otherwise survive; a forced fresh sign-in is cheap | none needed |
 | 2 | **`escrow_settings`, `settings`, `kyc_tier_limits`, `delivery_method_settings`, `risk_hold_settings` are kept as they are, test edits included** | wiping them would remove a fee schedule that has no seed, or reset limits you set | **Q1.** Were any of these changed for testing only (a tiny fee, a high limit)? The dry run prints every kept value; fix any you don't want in the admin console after the reset |
-| 3 | **Every other admin is deleted**, including any QA or second superadmin | you said "keep only my admin account" | **Q2.** Is anyone else an admin who should survive (a developer, a support person)? If so say so now: the script keeps exactly one |
+| 3 | **Every other admin is deleted**, including any QA or second superadmin | you said "keep only my admin account" | **Q2.** Is anyone else an admin who should survive (a developer, a support person)? If so say so now: the script keeps exactly one. **Lockout warning:** if you are the only superadmin, nobody can reset your second factors (the console refuses a self-reset, `CANNOT_RESET_SELF`, in `app/api/v1/endpoints/mfa_recovery.py`). Losing every factor and every recovery code then means the platform break-glass Job (`app.cli.admin_mfa_reset`), a snapshot restore, or a raw database edit (runbook, *If you are locked out*). A second superadmin who is also a trusted person is the better safety net, if you can name one |
 | 4 | **The audit trail is deleted** (security and admin audit logs, including yours) apart from the one reset row | it is test-time activity; a reset that kept it would keep tester emails and IPs | **Q3.** Do you want the old audit logs exported first (off-AWS backup already holds them)? |
-| 5 | **`jobs` is wiped, so the worker must be restarted** (runbook step 5) | the table holds queued work about deleted users; the worker re-seeds its recurring chores only at start-up | none |
-| 6 | The reset **refuses** unless your admin is `superadmin`, active, has set a password and has at least one confirmed second factor | otherwise the reset could leave you with no way in | none |
+| 5 | **`jobs` is wiped, and the worker is stopped (scaled to 0) for the whole window, then started again** (runbook steps 0b and 5) | the table holds queued work about deleted users; the worker polls it and re-seeds its recurring chores only at start-up, so starting it from zero after the reset is what restores them | none |
+| 6 | The reset **refuses** unless your admin is `superadmin`, active, has set a password, has at least one confirmed second factor **and at least one unused recovery code** (it warns if you have only one factor) | after the reset you are the only admin and cannot reset yourself; a recovery code is the way back from a lost factor | none; generate codes first |
 | 7 | **Your regular `users` account, if you ever had one with the same email, is wiped** | not an admin row | none; sign up a test user with a different email afterwards |
 | 8 | **Ambiguous table?** None: all 72 decided. If a future release adds one, the script stops and lists it (default would be wipe) | fail closed | none |
+| 9 | **Partners are wiped** (`partners`, `partner_users`, `partner_commission_rules`, `partner_statements`, `partner_commission_entries`). No partner exists on production yet, as far as the code and the owner's earlier statements show | the partner program is built but nothing was onboarded | **Q4.** Confirm no real partner (a fintech with a portal login and a commission rule) has been created on production. If one has, say so now and it will be kept |
+| 10 | **Paystack test side effects are accepted** | a test dedicated account stays bound to its test customer (found by email), and a late test webhook can name a reference that no longer exists | none, but use a new email for any re-test before live keys; see the runbook table |
 
 ## How
 
@@ -52,7 +54,7 @@ except `kyc_tier_limits`, `risk_hold_settings` (cleared first, above) and the au
 | **Idempotent:** when there is nothing to delete, it prints `NOTHING_TO_RESET`, writes nothing (no second audit row), exits 0 | a re-run after a half-remembered first run is safe |
 | **Identity = the migration's:** ServiceAccount `db-migrate`, Vault role `weysure-migrate` (30-minute credential, member of `weysure_owner`, which owns every table) | the API's own role `weysure_app` has DML only, so it **cannot** truncate (proven: the guard refuses it, `lacks the privilege`, before changing anything). The RDS master would work but is far more power than needed (the other bootstrap Jobs fetch it from Secrets Manager; this one never does). Least privilege that can do the job |
 | **Job lives outside Argo's path** (`projects/weysure/manual/prod/`), applied by `scripts/db-reset-prod.sh`, never synced | Argo's `weysure-prod` app syncs `projects/weysure/environments/prod` **recursively and automatically**: a Job under `…/bootstrap/` (where the other one-shot Jobs sit) would run **the moment its PR merges**. For a data wipe, "merge = run" is unacceptable, so merging changes nothing in the cluster |
-| **The script is the gate:** a real run refuses unless a manual RDS snapshot < 6 h old is `available`, a nightly off-AWS backup < 26 h old succeeded (or the owner states a manual dump), a dry run succeeded < 24 h ago, and the owner types `RESET` | turns the owner's two preconditions into checks the machine enforces |
+| **The script is the gate**, and every age check fails closed (an empty or unreadable time is a failure; the first version let an empty value through, found in review). Both modes: gitops checkout clean, on `main`, equal to `origin/main` after a fetch; `api-worker` at 0. A real run additionally: a manual RDS snapshot < 6 h old and `available`; a nightly off-AWS backup < 26 h old (or the owner states a manual dump); a successful dry run **of the same manifest** (sha256 stamped on the Job as an annotation) < 24 h ago; and the owner types `RESET` | turns the owner's preconditions into checks the machine enforces, and ties the dry run the owner read to the file that is about to run |
 | **Kyverno-compliant:** non-root 1000, read-only root filesystem, drop ALL, `RuntimeDefault` seccomp, requests and limits, image pinned by tag **and** digest (`postgres:16.16-alpine3.23@sha256:a23cda8e…`, the same image as the backup CronJob) | verified with the cluster's Kyverno CLI version (v1.19.1): 9 pass, 0 fail; kubeconform strict: valid |
 | `backoffLimit: 0`, `activeDeadlineSeconds: 900`, `ttlSecondsAfterFinished: 604800` | a destructive Job is never retried by Kubernetes; logs kept a week (Loki keeps them too) |
 
@@ -63,7 +65,7 @@ except `kyc_tier_limits`, `risk_hold_settings` (cleared first, above) and the au
 | `plateng-gitops` `projects/weysure/manual/prod/db-reset-prod-v1-job.yaml` | the Job: SQL embedded in `args`, DB URL from the Vault agent file (never printed), params `DRY_RUN` / `OWNER_EMAIL` / `EXPECT_DB` |
 | `plateng-gitops` `projects/weysure/manual/prod/README.md` | why this directory is not synced |
 | this repo `scripts/db-reset-prod.sh` | owner's wrapper: renders the Job (two substitutions), runs the safety checks, waits, prints the output |
-| this repo `scripts/weysure-data-reset/` | `prove-local.sh` (the proof harness), `seed_sample_data.py` (rows in all 72 tables), `owner_signin_check.py` (the owner's real sign-in on the wiped database) |
+| this repo `scripts/weysure-data-reset/` | `prove-local.sh` (the SQL proof harness), `seed_sample_data.py` (rows in all 72 tables), `owner_signin_check.py` (the owner's real sign-in on the wiped database), `test-gates.sh` (repro of the script's safety gates with stubbed `kubectl`/`aws` and a temp git origin) |
 | this repo `projects/weysure/docs/runbooks/PROD_DATA_RESET.md`, `…/evidence/2026-11-20-prod-data-reset-proof.txt` | the owner's steps; the captured proof |
 | Production | read once by the Job (guards and counts), then written once (the reset). No config, flag, secret or migration changes |
 
@@ -72,7 +74,7 @@ except `kyc_tier_limits`, `risk_hold_settings` (cleared first, above) and the au
 `scripts/weysure-data-reset/prove-local.sh` on a throwaway `postgres:16.16-alpine3.23` (Docker), with the prod role layout (`weysure_owner` owns the tables,
 `weysure_app` has DML, a Vault-style login user that switches into the owner role). The schema comes from a real `alembic upgrade head` of Weysure-API `de5e9d06ff92`
 (head `c9e1f3a5b7d2`, 72 tables). The harness extracts the Job's own `args` script from the YAML and runs **that**, unchanged, in the Job's pinned image with
-its security flags (non-root, read-only rootfs, drop ALL). **98 checks, all passed**; log: [evidence](../evidence/2026-11-20-prod-data-reset-proof.txt).
+its security flags (non-root, read-only rootfs, drop ALL). **107 checks, all passed**; log: [evidence](../evidence/2026-11-20-prod-data-reset-proof.txt).
 
 | Proved | How |
 |---|---|
@@ -81,7 +83,9 @@ its security flags (non-root, read-only rootfs, drop ALL). **98 checks, all pass
 | **Real run**: 62 wipe tables empty; owner admin row, **both** his factors (authenticator + passkey record) and his recovery codes, all config rows (apart from the cleared "edited by" pointers) and `alembic_version` **byte-identical**; exactly 1 admin; one audit row; every foreign key still validated; sessions and tokens gone | content hashes |
 | **Second real run and a dry run after it**: `NOTHING_TO_RESET`, whole-database content fingerprint unchanged, still exactly one audit row | fingerprint |
 | **The owner can sign in on the wiped database** through the app's own HTTP routes: password → second factor required (passkey, authenticator and recovery code offered) → TOTP accepted → `/admin/me` is the owner (superadmin) → dashboard, fee settings and analytics answer 200 → a brand-new user signs up → exactly 1 user → wrong password still refused → `/health` 200 | `owner_signin_check.py` (FastAPI TestClient, real Postgres) |
-| **Guards refuse** (14 cases) and leave every row unchanged (content fingerprint equal): owner email missing; a fresh schema with no admin; wrong database name; `DRY_RUN=maybe` and empty; owner not superadmin; inactive; password pending; no confirmed factor; two admins with the owner's email; an unclassified table; a kept table with a foreign key to a wiped table; a table the database user cannot truncate; run as `weysure_app`. **Plus** one positive case: a stale reset record written by another admin does not block deleting that admin | `refuse()` cases |
+| **Guards refuse** (15 cases) and leave every row unchanged (content fingerprint equal): owner email missing; a fresh schema with no admin; wrong database name; `DRY_RUN=maybe` and empty; owner not superadmin; inactive; password pending; no confirmed factor; **no unused recovery code**; two admins with the owner's email; an unclassified table; a kept table with a foreign key to a wiped table; a table the database user cannot truncate; run as `weysure_app`. **Plus** two positive cases: a stale reset record written by another admin does not block deleting that admin, and an owner with one factor but an unused recovery code passes with a visible warning | `refuse()` cases |
+| **The no-op second run says `NOTHING_TO_RESET` and nothing else** (an earlier version also printed `RESET_COMMITTED: all other data is gone`, which was false) | harness checks the line is absent |
+| **The script's gates**: `test-gates.sh` (37 cases, all passed): the age helpers fail on empty, garbage, no-timezone, future, too old and a non-numeric limit; snapshot / backup / dry-run gates refuse on missing, `None`, id without time, unreadable time, too old, not succeeded, and a dry run of a different manifest hash; `api-worker` at 1 or unreadable is refused in both modes; a modified manifest, an untracked file, a local HEAD behind `origin/main` after a fetch, and a branch other than `main` are refused; after pulling a newer manifest the earlier dry run no longer counts; rendering sets the right name, `DRY_RUN`, hash annotation and labels | bash repro with stubs, no cluster |
 | The existing API unit/integration test files were **not** run against the wiped database | they build their own database from the models (`create_all`) and insert their own rows, so they would prove nothing about the wiped data; the sign-in check above is the stronger test. No full suite, per the machine rule |
 
 **Not proven, and why**
@@ -91,7 +95,7 @@ its security flags (non-root, read-only rootfs, drop ALL). **98 checks, all pass
 | Run against real RDS `weysure-postgres-v2` | prod is human-gated; the dry run **is** the first live test and changes nothing |
 | Vault credential flow, NetworkPolicy, Kyverno admission by the live cluster, Docker Hub pull from the node | mirrors the chart's migration Job and the backup CronJob's image; checked statically (`helm template` of the chart, Kyverno CLI v1.19.1 9/9, kubeconform). `DRY_SERVER=1 scripts/db-reset-prod.sh dry` makes the API server validate it |
 | The prod data's own shape | prod holds testers' data; if it has a row the seeder could not imagine (e.g. an admin with a different role, two owner rows), the guards stop the run and say so |
-| `rollout restart api-worker` re-seeding the chores | the sweep code was read, not run; the runbook checks the worker log for `startup sweep … scheduled` |
+| Starting `api-worker` from zero re-seeding the chores | the sweep code was read, not run; the runbook checks the worker log for `startup sweep … scheduled` |
 | Cloudinary clean-up | by hand, in the runbook |
 
 ## Operate / roll back
@@ -102,7 +106,7 @@ Retire the Job by deleting `projects/weysure/manual/prod/` in gitops once the re
 
 ## Follow-ups
 
-- Owner answers Q1–Q3 above before the real run.
+- Owner answers Q1–Q4 above before the real run, and enrols a second factor and saves recovery codes first.
 - Delete the pre-reset RDS snapshot and Drive dump after 30 days (they hold testers' personal data).
 - Clean the Cloudinary `weysure/` folders (runbook).
 - If a migration adds a table before the reset runs, add it to the `reset_class` block (the Job refuses until then) and re-run `prove-local.sh`.

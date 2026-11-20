@@ -1,6 +1,7 @@
-# Evidence: scripts/weysure-data-reset/prove-local.sh, 2026-11-20 (local throwaway postgres:16.16-alpine3.23, Docker, removed afterwards)
-# Schema: Weysure-API de5e9d06ff92 (alembic head c9e1f3a5b7d2), 72 tables. All data is fake. The app's INFO/WARNING log lines are filtered out.
+# Evidence, 2026-11-20 (local throwaway postgres:16.16-alpine3.23, Docker, removed afterwards)
+# Part 1: scripts/weysure-data-reset/prove-local.sh (the SQL). Schema: Weysure-API de5e9d06ff92 (alembic head c9e1f3a5b7d2), 72 tables. All data is fake. The app's INFO/WARNING log lines are filtered out.
 # The TRUNCATE statement the Job logs (62 table names) is shortened on this page only.
+# Part 2 (end of file): scripts/weysure-data-reset/test-gates.sh (the owner script's safety gates, stubbed kubectl/aws).
 
 image in Job: postgres:16.16-alpine3.23@sha256:a23cda8ed4733a74cd0a328fcb525a43c35cdbaa845b6fdb8f343646f995cc1e
 
@@ -22,7 +23,7 @@ owner admin: id=adm-owner-0001 factors=2 recovery codes=10; other admins=2
 
 === WEYSURE production data reset ===
 MODE: DRY RUN. Everything below runs, then ROLLS BACK. Nothing is changed.
-psql:/tmp/reset.sql:187: NOTICE:  guard passed: database weysure, 1 owner admin, 2 active second factor(s), user weysure_owner
+psql:/tmp/reset.sql:201: NOTICE:  guard passed: database weysure, 1 owner admin, 2 active second factor(s), 10 unused recovery code(s), user weysure_owner
 TRUNCATE  <the 62 wipe tables, all schema-qualified, listed once each>  RESTART IDENTITY;
 
 --- per table: class (keep / owner / audit / wipe), rows before, rows after ---
@@ -254,7 +255,7 @@ db-reset-prod-v1 finished (DRY_RUN=true)
 
 --- what stays: the owner admin (no password hash, no secrets) ---
 
-RESET_COMMITTED: all other data is gone. Restart api-worker next (see the runbook).
+RESET_COMMITTED: all other data is gone. Scale api-worker back up next (see the runbook).
 db-reset-prod-v1 finished (DRY_RUN=false)
   PASS  real run exits 0
   PASS  real run ends with RESET_COMMITTED
@@ -276,13 +277,14 @@ ices=0 usage_logs=0 user_sessions=0 users=0 wallet_holds=0 wallet_lot_allocation
   PASS  sessions and refresh tokens of the owner are gone (fresh sign-in required)
 
 == 4. SECOND REAL RUN: idempotent, changes nothing (not even a second audit row) ==
-NOTHING_TO_RESET: the database already holds only the kept rows. No change was made.
-RESET_COMMITTED: all other data is gone. Restart api-worker next (see the runbook).
+NOTHING_TO_RESET: the database already holds only the kept rows. No change was made (no new audit row).
   PASS  second run exits 0
   PASS  second run says NOTHING_TO_RESET
+  PASS  second run does NOT claim RESET_COMMITTED / 'all other data is gone'
   PASS  whole-database data dump identical before/after the second run
   PASS  still exactly one audit row
   PASS  a dry run after the real run also says NOTHING_TO_RESET
+  PASS    and does not print RESET_DRY_RUN_ROLLED_BACK
 
 == 4b. the owner can sign in and use the console on the wiped database (the app's own HTTP routes) ==
   users before signup: 0 | sessions: 0 | refresh tokens: 0
@@ -296,7 +298,7 @@ RESET_COMMITTED: all other data is gone. Restart api-worker next (see the runboo
   PASS  admin dashboard loads (empty platform)
   PASS  fee settings (kept config) readable in the console
   PASS  analytics endpoint answers
-2026-11-20 13:04:13.967 | ERROR    | app.services.email:send_email_smtp:108 - Failed to send email: SMTPServerDisconnected
+2026-11-20 13:15:29.045 | ERROR    | app.services.email:send_email_smtp:108 - Failed to send email: SMTPServerDisconnected
   PASS  a brand-new user can sign up on the wiped database
   PASS  exactly one user exists now (the new signup)
   PASS  dashboard still loads with that user
@@ -305,18 +307,18 @@ OWNER SIGN-IN CHECKS PASSED
   PASS  owner sign-in script exit code
 
 == 5. GUARDS: each refusal exits non-zero and leaves every row where it was ==
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
   PASS  owner admin missing from a database full of data: exit non-zero
   PASS  owner admin missing from a database full of data: message mentions 'expected exactly 1 admin'
   PASS  owner admin missing from a database full of data: no RESET_COMMITTED printed
   PASS  owner admin missing from a database full of data: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
   PASS  fresh schema without any admin: exit non-zero
   PASS  fresh schema without any admin: message mentions 'expected exactly 1 admin'
   PASS  fresh schema without any admin: no RESET_COMMITTED printed
   PASS  fresh schema without any admin: data unchanged
   PASS  probe row still there
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: connected to database "weysure_other", this reset is for "weysure"
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: connected to database "weysure_other", this reset is for "weysure"
   PASS  database name is not weysure: exit non-zero
   PASS  database name is not weysure: message mentions 'connected to database'
   PASS  database name is not weysure: no RESET_COMMITTED printed
@@ -331,53 +333,61 @@ OWNER SIGN-IN CHECKS PASSED
   PASS  DRY_RUN empty: message mentions 'DRY_RUN must be exactly true or false'
   PASS  DRY_RUN empty: no RESET_COMMITTED printed
   PASS  DRY_RUN empty: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: the owner admin is "admin", not "superadmin"
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin is "admin", not "superadmin"
   PASS  owner admin: role: exit non-zero
   PASS  owner admin: role: message mentions 'not "superadmin"'
   PASS  owner admin: role: no RESET_COMMITTED printed
   PASS  owner admin: role: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: the owner admin is not active
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin is not active
   PASS  owner admin: inactive: exit non-zero
   PASS  owner admin: inactive: message mentions 'is not active'
   PASS  owner admin: inactive: no RESET_COMMITTED printed
   PASS  owner admin: inactive: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: the owner admin has not set a password yet (invite pending)
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has not set a password yet (invite pending)
   PASS  owner admin: password pending: exit non-zero
   PASS  owner admin: password pending: message mentions 'not set a password'
   PASS  owner admin: password pending: no RESET_COMMITTED printed
   PASS  owner admin: password pending: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: the owner admin has no confirmed second factor; enrol one in the console firs
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has no confirmed second factor; enrol one in the console firs
   PASS  owner admin: no factor: exit non-zero
   PASS  owner admin: no factor: message mentions 'no confirmed second factor'
   PASS  owner admin: no factor: no RESET_COMMITTED printed
   PASS  owner admin: no factor: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 2
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has no unused recovery code. After the reset nobody else could rescue the account; generate new recovery codes i
+  PASS  owner admin: no unused recovery code: exit non-zero
+  PASS  owner admin: no unused recovery code: message mentions 'no unused recovery code'
+  PASS  owner admin: no unused recovery code: no RESET_COMMITTED printed
+  PASS  owner admin: no unused recovery code: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 2
   PASS  owner admin: two admins with the owner email: exit non-zero
   PASS  owner admin: two admins with the owner email: message mentions 'found 2'
   PASS  owner admin: two admins with the owner email: no RESET_COMMITTED printed
   PASS  owner admin: two admins with the owner email: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: tables not classified in this script: brand_new_feature
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: tables not classified in this script: brand_new_feature
   PASS  an unclassified table exists (future migration): exit non-zero
   PASS  an unclassified table exists (future migration): message mentions 'not classified'
   PASS  an unclassified table exists (future migration): no RESET_COMMITTED printed
   PASS  an unclassified table exists (future migration): data unchanged
-  output: psql:/tmp/reset.sql:229: ERROR:  cannot truncate a table referenced in a foreign key constrain
+  output: psql:/tmp/reset.sql:243: ERROR:  cannot truncate a table referenced in a foreign key constrain
   PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): exit non-zero
   PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): message mentions 'cannot truncate a table referenced in a foreign key'
   PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): no RESET_COMMITTED printed
   PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: database user "weysure_owner" lacks the privilege this reset needs on: users
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: database user "weysure_owner" lacks the privilege this reset needs on: users
   PASS  the database user lacks TRUNCATE on a table: exit non-zero
   PASS  the database user lacks TRUNCATE on a table: message mentions 'lacks the privilege'
   PASS  the database user lacks TRUNCATE on a table: no RESET_COMMITTED printed
   PASS  the database user lacks TRUNCATE on a table: data unchanged
-  output: psql:/tmp/reset.sql:187: ERROR:  REFUSED: database user "v_app_local" lacks the privilege this reset needs on: account_freezes, admin_notification_states, admin_notifica
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: database user "v_app_local" lacks the privilege this reset needs on: account_freezes, admin_notification_states, admin_notifica
   PASS  run as weysure_app (DML only: the guard refuses before any change): exit non-zero
   PASS  run as weysure_app (DML only: the guard refuses before any change): message mentions 'lacks the privilege'
   PASS  run as weysure_app (DML only: the guard refuses before any change): no RESET_COMMITTED printed
   PASS  run as weysure_app (DML only: the guard refuses before any change): data unchanged
   PASS  stale reset record by another admin: real run exits 0
   PASS    and leaves 1 admin and exactly the new audit row by the owner
+  PASS  one factor + unused recovery code: dry run exits 0
+  PASS    and prints the single-factor WARNING
+  PASS    and reports the unused recovery codes it found
 
 == 6. what the reset leaves behind works: the app's own write paths on the wiped database ==
   PASS  a job can be inserted again (jobs table usable, dedupe index intact)
@@ -386,3 +396,48 @@ OWNER SIGN-IN CHECKS PASSED
 
 == RESULT ==
 ALL CHECKS PASSED
+
+################ Part 2: gates ################
+== 1. the age helpers fail closed
+  (the old gate: an empty age is treated as 0, so  [[ "" -ge 6 ]]  is false and the gate PASSES: passed)
+  PASS  age_ok: empty -> fail
+  PASS  age_ok: garbage -> fail
+  PASS  age_ok: naive (no timezone) -> fail
+  PASS  age_ok: future -> fail
+  PASS  age_ok: too old -> fail
+  PASS  age_ok: max not a number -> fail
+  PASS  age_ok: fresh -> pass
+  PASS  age_hours prints nothing for garbage (not 0)
+== 2. the gates of the real script, with stubs
+  PASS  all gates satisfied: reaches the server dry run, exit 0
+  PASS  snapshot: none -> FAIL 1
+  PASS  snapshot: 'None' -> FAIL 1
+  PASS  snapshot: id without a time -> FAIL 1 (was a silent pass)
+  PASS  snapshot: unreadable time -> FAIL 1 (was a silent pass)
+  PASS  snapshot: 7 h old -> FAIL 1
+  PASS  backup: no timestamp, no override -> FAIL 2 (was a silent pass)
+  PASS  backup: unreadable time -> FAIL 2
+  PASS  backup: 30 h old -> FAIL 2
+  PASS  backup: manual dump stated -> passes
+  PASS  dry run: no completion time -> FAIL 3 (was a silent pass)
+  PASS  dry run: not succeeded -> FAIL 3
+  PASS  dry run: 30 h old -> FAIL 3
+  PASS  dry run of a DIFFERENT manifest hash -> FAIL 3
+  PASS  dry run: kubectl returns nothing -> FAIL 3
+  PASS  api-worker at 1 replica -> refused (real)
+  PASS  api-worker at 1 replica -> refused (dry)
+  PASS  api-worker replicas unreadable -> refused
+== 3. the gitops checkout must be clean, on main and equal to origin/main
+  PASS  modified manifest -> refused
+  PASS  untracked file -> refused
+  PASS  local HEAD behind origin/main (after fetch) -> refused
+  PASS  after pulling, the earlier dry run belongs to the OLD manifest -> FAIL 3
+  PASS  a dry run of the new manifest -> passes
+  PASS  not on main -> refused
+== 4. rendering (PRINT=1 runs no checks)
+  PASS  name is db-reset-prod-v1-real-<time>
+  PASS  DRY_RUN is false for real
+  PASS  manifest sha annotation is the file's sha256
+  PASS  mode label on the Job and the pod
+  PASS  dry render keeps DRY_RUN true
+ALL GATE CASES PASSED

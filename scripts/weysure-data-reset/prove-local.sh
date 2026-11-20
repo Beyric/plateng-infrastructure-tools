@@ -153,10 +153,12 @@ runjob weysure v_migrate_local false
 grep -E "NOTHING_TO_RESET|RESET_COMMITTED" "$WORK/out.txt"
 check "second run exits 0" "$RC" "0"
 check "second run says NOTHING_TO_RESET" "$(grep -c NOTHING_TO_RESET "$WORK/out.txt")" "1"
+check "second run does NOT claim RESET_COMMITTED / 'all other data is gone'" "$(grep -c -E 'RESET_COMMITTED|all other data is gone' "$WORK/out.txt")" "0"
 check "whole-database data dump identical before/after the second run" "$(dumpsum weysure)" "$AFTER1_HASH_ALL"
 check "still exactly one audit row" "$(val weysure "select count(*) from admin_audit_logs")" "1"
 runjob weysure v_migrate_local true
 check "a dry run after the real run also says NOTHING_TO_RESET" "$(grep -c NOTHING_TO_RESET "$WORK/out.txt")" "1"
+check "  and does not print RESET_DRY_RUN_ROLLED_BACK" "$(grep -c RESET_DRY_RUN_ROLLED_BACK "$WORK/out.txt")" "0"
 
 # ---------------------------------------------------------------------------------------------
 section "4b. the owner can sign in and use the console on the wiped database (the app's own HTTP routes)"
@@ -197,6 +199,7 @@ for case in "role|UPDATE admins SET role='admin' WHERE lower(email)='beyrichq@gm
             "inactive|UPDATE admins SET is_active=false WHERE lower(email)='beyrichq@gmail.com'|is not active" \
             "password pending|UPDATE admins SET password_pending=true WHERE lower(email)='beyrichq@gmail.com'|not set a password" \
             "no factor|UPDATE mfa_factors SET disabled_at=now() WHERE subject_type='admin' AND subject_id=(SELECT id FROM admins WHERE lower(email)='beyrichq@gmail.com')|no confirmed second factor" \
+            "no unused recovery code|UPDATE mfa_recovery_codes SET used_at=now() WHERE subject_type='admin' AND subject_id=(SELECT id FROM admins WHERE lower(email)='beyrichq@gmail.com')|no unused recovery code" \
             "two admins with the owner email|INSERT INTO admins (id,email,hashed_password,role,created_at,updated_at) VALUES ('dup','BeyrichQ@Gmail.com','x','admin',now(),now())|found 2"; do
   IFS='|' read -r label sql frag <<<"$case"
   db="g_$(echo "$label" | tr -c '[:lower:]' '_' | cut -c1-12)"
@@ -224,6 +227,14 @@ pg -d g_stale -c "INSERT INTO admin_audit_logs (id, admin_id, action, timestamp,
 runjob g_stale v_migrate_local false
 check "stale reset record by another admin: real run exits 0" "$RC" "0"
 check "  and leaves 1 admin and exactly the new audit row by the owner" "$(val g_stale "select (select count(*) from admins)||':'||(select count(*) from admin_audit_logs where admin_id='adm-owner-0001')||':'||(select count(*) from admin_audit_logs)")" "1:1:1"
+
+# 5j. positive: an owner with ONE factor but an unused recovery code passes, with a visible warning
+pg -d postgres -c "CREATE DATABASE g_onefactor TEMPLATE weysure_seeded" >/dev/null
+pg -d g_onefactor -c "DELETE FROM mfa_factors WHERE id='fac-owner-passkey'" >/dev/null
+runjob g_onefactor v_migrate_local true
+check "one factor + unused recovery code: dry run exits 0" "$RC" "0"
+check "  and prints the single-factor WARNING" "$(grep -c 'WARNING: the owner has only 1 second factor' "$WORK/out.txt")" "1"
+check "  and reports the unused recovery codes it found" "$(grep -c 'unused recovery code(s)' "$WORK/out.txt")" "1"
 
 # ---------------------------------------------------------------------------------------------
 section "6. what the reset leaves behind works: the app's own write paths on the wiped database"
