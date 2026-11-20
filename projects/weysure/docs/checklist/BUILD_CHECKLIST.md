@@ -363,6 +363,24 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 
 ---
 
+## Staging environment 🔵 *(prepared 2026-11-20, **not applied** · [SOP](../sop/2026-11-20-staging-environment.md) · [runbook](../runbooks/STAGING_ENVIRONMENT.md))*
+
+*Exit criteria: every merge to `main` reaches `staging.weysure.com` on test keys first; prod follows after the smoke list.*
+
+- [x] Capacity and cost read from the cluster (fits, no new node; ≈ $16–17/mo)
+- [x] Terraform: second RDS (`weysure-stage-postgres`) + bootstrap IAM, plan 8 add / 0 change / 0 destroy *(PR `feature/staging-rds`)*
+- [x] Gitops: `environments/stage/`, three Argo applications, chart options, Kyverno Enforce in stage *(PR `feature/staging-environment`)*
+- [x] CI: promote stage first then prod, web `-stage` image *(PRs `ci/promote-to-stage-first`, Weysure-API and Weysure)*
+- [x] Runbook, SOP, smoke list, reset Job
+- [ ] `terraform apply` (Adebayo)
+- [ ] Vault policies, roles, `secret/weysure/stage` (Adebayo)
+- [ ] Cloudflare DNS + allow-list rule (Adebayo)
+- [ ] Merge gitops PR; bootstrap Job Complete, certificates Ready, `weysure-api-stage` Healthy
+- [ ] Merge the two Jenkinsfile PRs; first `-stage` web image promoted
+- [ ] First admin on stage; Paystack test webhook pointed at stage
+- [ ] First full smoke list green on stage
+- [x] `PROMOTE_TO_PROD=manual` decided (2026-11-20); prod is promoted by a gitops PR after the stage smoke list
+
 ## Backlog — identified, not yet scheduled
 
 - [x] **Login tokens in logs** — Alloy redacts JWTs in all namespaces (gitops #79); `SECRET_KEY` rotated 2026-10-15 22:12 UTC to void the 367 stored tokens *([SOP](../sop/2026-10-15-jwt-in-logs-redaction.md))*

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run ONE SQL statement or ONE alembic command against the weysure-prod database, as a
+# Run ONE SQL statement or ONE alembic command against the weysure-prod database (or, with TARGET=stage, the stage one), as a
 # one-off Job with exactly the identity of the PreSync migration: ServiceAccount
 # db-migrate, Vault role weysure-migrate (30-min credential), NetworkPolicy label
 # app.kubernetes.io/name=db-migrate, the chart's security context. The Job is rendered
@@ -20,7 +20,8 @@
 # Runbook: projects/weysure/docs/runbooks/DEPLOYMENT_ROLLBACK.md
 set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-beyric-admin} AWS_REGION=${AWS_REGION:-us-east-1}
-NS=weysure-prod; CLUSTER=beyric-prod; REPO=weysure-api
+TARGET=${TARGET:-prod}; case "$TARGET" in prod|stage) ;; *) echo "TARGET must be prod or stage, got '$TARGET'"; exit 2 ;; esac
+NS=weysure-$TARGET; CLUSTER=beyric-prod; REPO=weysure-api
 GITOPS=${GITOPS:-$(cd "$(dirname "$0")/../../plateng-gitops" 2>/dev/null && pwd || true)}
 TAG=${1:-}; MODE=${2:-}; ARG=${3:-}
 usage(){ sed -n '9,11p' "$0" | sed 's/^# *//'; exit 2; }
@@ -42,7 +43,7 @@ if [[ "$GB" != main && "${ALLOW_BRANCH:-}" != 1 && "${PRINT:-}" != 1 ]]; then
 fi
 NAME=db-oneoff-$(date -u +%Y%m%d%H%M%S)
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
-P=$GITOPS/projects/weysure/environments/prod
+P=$GITOPS/projects/weysure/environments/$TARGET
 helm template weysure-api "$GITOPS/charts/beyric-app" -n $NS -f $P/apps/api/values.yaml -f $P/images.yaml \
   --set image.tag="$TAG" --show-only templates/migration-job.yaml > "$WORK/job.yaml"
 
@@ -99,7 +100,7 @@ echo "  command: $ARG"
 if [[ "${DRY:-}" == 1 ]]; then kubectl create -f "$WORK/job.yaml" --dry-run=server -o name | sed 's/$/  (server dry run: accepted, nothing created)/'; exit 0; fi
 need=""; [[ "$MODE" == write ]] && need="write"
 [[ "$MODE" == alembic && "$ARG" =~ ^(downgrade|upgrade|stamp) ]] && need="alembic"
-if [[ -n "$need" ]]; then read -r -p "This changes the production database. Type '$need' to run: " a; [[ "$a" == "$need" ]] || { echo "not run"; exit 1; }
+if [[ -n "$need" ]]; then read -r -p "This changes the $TARGET database. Type '$need' to run: " a; [[ "$a" == "$need" ]] || { echo "not run"; exit 1; }
 else read -r -p "Run it? [y/N] " a; [[ "$a" == y ]] || { echo "not run"; exit 1; }; fi
 
 kubectl create -f "$WORK/job.yaml" >/dev/null
