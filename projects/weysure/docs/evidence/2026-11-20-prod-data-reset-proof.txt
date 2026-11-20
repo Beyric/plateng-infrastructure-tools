@@ -1,0 +1,443 @@
+# Evidence, 2026-11-20 (local throwaway postgres:16.16-alpine3.23, Docker, removed afterwards)
+# Part 1: scripts/weysure-data-reset/prove-local.sh (the SQL). Schema: Weysure-API de5e9d06ff92 (alembic head c9e1f3a5b7d2), 72 tables. All data is fake. The app's INFO/WARNING log lines are filtered out.
+# The TRUNCATE statement the Job logs (62 table names) is shortened on this page only.
+# Part 2 (end of file): scripts/weysure-data-reset/test-gates.sh (the owner script's safety gates, stubbed kubectl/aws).
+
+image in Job: postgres:16.16-alpine3.23@sha256:a23cda8ed4733a74cd0a328fcb525a43c35cdbaa845b6fdb8f343646f995cc1e
+
+== 0. throwaway postgres 16 + the prod role layout (weysure_owner owns tables, weysure_app has DML only) ==
+PostgreSQL 16.16 on aarch64-unknown-linu
+alembic upgrade head from an empty database -> c9e1f3a5b7d2 ; tables: 72
+  PASS  all tables owned by weysure_owner, not a superuser
+
+== 1. seed realistic sample data into EVERY table (fake values only) ==
+seeding ('weysure_seeded', 'weysure_owner')
+seeded; total rows now 377; tables that could not be seeded: none
+  PASS  every one of the 72 public tables holds rows
+rows by class before: total=377
+  PASS  fingerprint is stable (two dumps of an untouched database agree)
+prepared: owner admin has a real password and 2 second factors (authenticator app + passkey record)
+owner admin: id=adm-owner-0001 factors=2 recovery codes=10; other admins=2
+
+== 2. DRY RUN (DRY_RUN=true): the full output the owner sees, then proof nothing changed ==
+
+=== WEYSURE production data reset ===
+MODE: DRY RUN. Everything below runs, then ROLLS BACK. Nothing is changed.
+psql:/tmp/reset.sql:201: NOTICE:  guard passed: database weysure, 1 owner admin, 2 active second factor(s), 10 unused recovery code(s), user weysure_owner
+TRUNCATE  <the 62 wipe tables, all schema-qualified, listed once each>  RESTART IDENTITY;
+
+--- per table: class (keep / owner / audit / wipe), rows before, rows after ---
+ class |             table              | before | after
+-------+--------------------------------+--------+-------
+ keep  | alembic_version                |      1 |     1
+ keep  | delivery_method_settings       |      4 |     4
+ keep  | escrow_settings                |      1 |     1
+ keep  | kyc_tier_limits                |      4 |     4
+ keep  | risk_hold_settings             |      1 |     1
+ keep  | settings                       |      4 |     4
+ owner | admins                         |      3 |     1
+ owner | mfa_factors                    |      5 |     2
+ owner | mfa_recovery_codes             |     34 |    10
+ audit | admin_audit_logs               |      3 |     1
+ wipe  | account_freezes                |      3 |     0
+ wipe  | admin_notification_states      |      3 |     0
+ wipe  | admin_notifications            |      3 |     0
+ wipe  | api_keys                       |      3 |     0
+ wipe  | auth_sessions                  |      4 |     0
+ wipe  | bank_account_audit_logs        |      3 |     0
+ wipe  | bank_account_change_requests   |      3 |     0
+ wipe  | bank_accounts                  |      3 |     0
+ wipe  | business_documents             |      3 |     0
+ wipe  | business_events                |      3 |     0
+ wipe  | business_limits                |      3 |     0
+ wipe  | business_profiles              |      3 |     0
+ wipe  | chargeback_cases               |      3 |     0
+ wipe  | chargeback_events              |      3 |     0
+ wipe  | chargeback_recoveries          |      3 |     0
+ wipe  | deal_invites                   |      3 |     0
+ wipe  | dedicated_accounts             |      3 |     0
+ wipe  | developer_escrow_settings      |      3 |     0
+ wipe  | dispute_audit_logs             |      3 |     0
+ wipe  | disputes                       |      3 |     0
+ wipe  | dva_bvn_attempts               |      3 |     0
+ wipe  | dva_credits                    |      3 |     0
+ wipe  | dva_return_requests            |      3 |     0
+ wipe  | escrow_transaction_history     |     12 |     0
+ wipe  | escrow_transactions            |      3 |     0
+ wipe  | identity_fingerprints          |      3 |     0
+ wipe  | jobs                           |      3 |     0
+ wipe  | kyc_limit_overrides            |      3 |     0
+ wipe  | kyc_records                    |      3 |     0
+ wipe  | kyc_reviews                    |      3 |     0
+ wipe  | manual_payout_requests         |      3 |     0
+ wipe  | message_threads                |      3 |     0
+ wipe  | messages                       |     20 |     0
+ wipe  | mfa_challenges                 |      3 |     0
+ wipe  | mfa_recovery_requests          |      3 |     0
+ wipe  | notifications                  |     15 |     0
+ wipe  | otp_codes                      |      3 |     0
+ wipe  | partner_commission_entries     |      3 |     0
+ wipe  | partner_commission_rules       |      3 |     0
+ wipe  | partner_statements             |      3 |     0
+ wipe  | partner_users                  |      3 |     0
+ wipe  | partners                       |      3 |     0
+ wipe  | payment_methods                |      3 |     0
+ wipe  | payout_account_audit_logs      |      3 |     0
+ wipe  | payout_account_change_requests |      3 |     0
+ wipe  | ratings                        |      3 |     0
+ wipe  | refresh_tokens                 |      4 |     0
+ wipe  | risk_signal_sightings          |      3 |     0
+ wipe  | security_audit_logs            |     25 |     0
+ wipe  | source_refunds                 |      3 |     0
+ wipe  | support_tickets                |      3 |     0
+ wipe  | trusted_devices                |      3 |     0
+ wipe  | usage_logs                     |     30 |     0
+ wipe  | user_sessions                  |      3 |     0
+ wipe  | users                          |      3 |     0
+ wipe  | wallet_holds                   |      3 |     0
+ wipe  | wallet_lot_allocations         |      3 |     0
+ wipe  | wallet_lots                    |      3 |     0
+ wipe  | wallet_transactions            |     40 |     0
+ wipe  | webhook_deliveries             |     10 |     0
+ wipe  | webhooks                       |      3 |     0
+ wipe  | withdrawals                    |      3 |     0
+(72 rows)
+
+ class | tables | rows_before | rows_after
+-------+--------+-------------+------------
+ audit |      1 |           3 |          1
+ keep  |      6 |          15 |         15
+ owner |      3 |          42 |         13
+ wipe  |     62 |         319 |          0
+(4 rows)
+
+
+--- what stays: the owner admin (no password hash, no secrets) ---
+       id       |       email        |    role    | is_active | password_pending
+----------------+--------------------+------------+-----------+------------------
+ adm-owner-0001 | beyrichq@gmail.com | superadmin | t         | f
+(1 row)
+
+   kind   |            label            | confirmed | disabled
+----------+-----------------------------+-----------+----------
+ webauthn | Owner passkey (placeholder) | t         | f
+ totp     | Authenticator app           | t         | f
+(2 rows)
+
+--- what stays: config the platform runs on (check these are the values you want live) ---
+            key            |     value
+---------------------------+----------------
+ card_payment_max          | 50000
+ dva_card_cap_30d_tier2    | 500000
+ dva_provider_slug         | titan-paystack
+ kyc_transaction_threshold | 250000
+(4 rows)
+
+ tier | buy_per_escrow |   buy_30d   |  topup_30d  |   out_30d
+------+----------------+-------------+-------------+-------------
+    0 |       50000.00 |   200000.00 |   200000.00 |        0.00
+    1 |      200000.00 |   500000.00 |   500000.00 |        0.00
+    2 |     3000000.00 | 10000000.00 | 10000000.00 | 10000000.00
+    3 |    50000000.00 | 50000000.00 | 50000000.00 | 50000000.00
+(4 rows)
+
+       method       | deadline_hours | auto_release_hours
+--------------------+----------------+--------------------
+ digital_or_service |                |                 24
+ interstate_courier |            120 |                 24
+ local_delivery     |             48 |                 24
+ same_day_handover  |             24 |                 24
+(4 rows)
+
+ platform_fee_percentage | platform_fee_minimum | platform_fee_maximum | weysure_processing_fee | default_auto_release_days | payment_expiry_hours | is_active
+-------------------------+----------------------+----------------------+------------------------+---------------------------+----------------------+-----------
+                     1.5 |                  100 |                      |                     50 |                        30 |                   24 |
+(1 row)
+
+ alembic_version
+-----------------
+ c9e1f3a5b7d2
+(1 row)
+
+RESET_DRY_RUN_ROLLED_BACK: nothing was changed. The "after" column above is what a real run would leave.
+db-reset-prod-v1 finished (DRY_RUN=true)
+  PASS  dry run exits 0
+  PASS  dry run ends with RESET_DRY_RUN_ROLLED_BACK
+  PASS  dry run changed nothing (every table's row count identical)
+  PASS  dry run left no temp objects behind
+
+== 3. REAL RUN (DRY_RUN=false) ==
+--- per table: class (keep / owner / audit / wipe), rows before, rows after ---
+ class |             table              | before | after
+-------+--------------------------------+--------+-------
+ keep  | alembic_version                |      1 |     1
+ keep  | delivery_method_settings       |      4 |     4
+ keep  | escrow_settings                |      1 |     1
+ keep  | kyc_tier_limits                |      4 |     4
+ keep  | risk_hold_settings             |      1 |     1
+ keep  | settings                       |      4 |     4
+ owner | admins                         |      3 |     1
+ owner | mfa_factors                    |      5 |     2
+ owner | mfa_recovery_codes             |     34 |    10
+ audit | admin_audit_logs               |      3 |     1
+ wipe  | account_freezes                |      3 |     0
+ wipe  | admin_notification_states      |      3 |     0
+ wipe  | admin_notifications            |      3 |     0
+ wipe  | api_keys                       |      3 |     0
+ wipe  | auth_sessions                  |      4 |     0
+ wipe  | bank_account_audit_logs        |      3 |     0
+ wipe  | bank_account_change_requests   |      3 |     0
+ wipe  | bank_accounts                  |      3 |     0
+ wipe  | business_documents             |      3 |     0
+ wipe  | business_events                |      3 |     0
+ wipe  | business_limits                |      3 |     0
+ wipe  | business_profiles              |      3 |     0
+ wipe  | chargeback_cases               |      3 |     0
+ wipe  | chargeback_events              |      3 |     0
+ wipe  | chargeback_recoveries          |      3 |     0
+ wipe  | deal_invites                   |      3 |     0
+ wipe  | dedicated_accounts             |      3 |     0
+ wipe  | developer_escrow_settings      |      3 |     0
+ wipe  | dispute_audit_logs             |      3 |     0
+ wipe  | disputes                       |      3 |     0
+ wipe  | dva_bvn_attempts               |      3 |     0
+ wipe  | dva_credits                    |      3 |     0
+ wipe  | dva_return_requests            |      3 |     0
+ wipe  | escrow_transaction_history     |     12 |     0
+ wipe  | escrow_transactions            |      3 |     0
+ wipe  | identity_fingerprints          |      3 |     0
+ wipe  | jobs                           |      3 |     0
+ wipe  | kyc_limit_overrides            |      3 |     0
+ wipe  | kyc_records                    |      3 |     0
+ wipe  | kyc_reviews                    |      3 |     0
+ wipe  | manual_payout_requests         |      3 |     0
+ wipe  | message_threads                |      3 |     0
+ wipe  | messages                       |     20 |     0
+ wipe  | mfa_challenges                 |      3 |     0
+ wipe  | mfa_recovery_requests          |      3 |     0
+ wipe  | notifications                  |     15 |     0
+ wipe  | otp_codes                      |      3 |     0
+ wipe  | partner_commission_entries     |      3 |     0
+ wipe  | partner_commission_rules       |      3 |     0
+ wipe  | partner_statements             |      3 |     0
+ wipe  | partner_users                  |      3 |     0
+ wipe  | partners                       |      3 |     0
+ wipe  | payment_methods                |      3 |     0
+ wipe  | payout_account_audit_logs      |      3 |     0
+ wipe  | payout_account_change_requests |      3 |     0
+ wipe  | ratings                        |      3 |     0
+ wipe  | refresh_tokens                 |      4 |     0
+ wipe  | risk_signal_sightings          |      3 |     0
+ wipe  | security_audit_logs            |     25 |     0
+ wipe  | source_refunds                 |      3 |     0
+ wipe  | support_tickets                |      3 |     0
+ wipe  | trusted_devices                |      3 |     0
+ wipe  | usage_logs                     |     30 |     0
+ wipe  | user_sessions                  |      3 |     0
+ wipe  | users                          |      3 |     0
+ wipe  | wallet_holds                   |      3 |     0
+ wipe  | wallet_lot_allocations         |      3 |     0
+ wipe  | wallet_lots                    |      3 |     0
+ wipe  | wallet_transactions            |     40 |     0
+ wipe  | webhook_deliveries             |     10 |     0
+ wipe  | webhooks                       |      3 |     0
+ wipe  | withdrawals                    |      3 |     0
+(72 rows)
+
+ class | tables | rows_before | rows_after
+-------+--------+-------------+------------
+ audit |      1 |           3 |          1
+ keep  |      6 |          15 |         15
+ owner |      3 |          42 |         13
+ wipe  |     62 |         319 |          0
+(4 rows)
+
+
+--- what stays: the owner admin (no password hash, no secrets) ---
+
+RESET_COMMITTED: all other data is gone. Scale api-worker back up next (see the runbook).
+db-reset-prod-v1 finished (DRY_RUN=false)
+  PASS  real run exits 0
+  PASS  real run ends with RESET_COMMITTED
+after: account_freezes=0 admin_audit_logs=1 admin_notification_states=0 admin_notifications=0 admins=1 alembic_version=1 api_keys=0 auth_sessions=0 bank_account_audit_logs=0 bank_account_change_reques
+ts=0 bank_accounts=0 business_documents=0 business_events=0 business_limits=0 business_profiles=0 chargeback_cases=0 chargeback_events=0 chargeback_recoveries=0 deal_invites=0 dedicated_accounts=0 del
+ivery_method_settings=4 developer_escrow_settings=0 dispute_audit_logs=0 disputes=0 dva_bvn_attempts=0 dva_credits=0 dva_return_requests=0 escrow_settings=1 escrow_transaction_history=0 escrow_transac
+tions=0 identity_fingerprints=0 jobs=0 kyc_limit_overrides=0 kyc_records=0 kyc_reviews=0 kyc_tier_limits=4 manual_payout_requests=0 message_threads=0 messages=0 mfa_challenges=0 mfa_factors=2 mfa_reco
+very_codes=10 mfa_recovery_requests=0 notifications=0 otp_codes=0 partner_commission_entries=0 partner_commission_rules=0 partner_statements=0 partner_users=0 partners=0 payment_methods=0 payout_accou
+nt_audit_logs=0 payout_account_change_requests=0 ratings=0 refresh_tokens=0 risk_hold_settings=1 risk_signal_sightings=0 security_audit_logs=0 settings=4 source_refunds=0 support_tickets=0 trusted_dev
+ices=0 usage_logs=0 user_sessions=0 users=0 wallet_holds=0 wallet_lot_allocations=0 wallet_lots=0 wallet_transactions=0 webhook_deliveries=0 webhooks=0 withdrawals=0
+  PASS  no wipe table has a row lef
+  PASS  owner admin row, his factors and recovery codes, all config rows (apart from the updated_by pointers) and alembic_version are byte-identical
+  PASS  exactly 1 admin remains and it is the owner
+  PASS  owner keeps his 2 factors (authenticator app + passkey) and 10 recovery codes; nobody else's remain
+  PASS  alembic_version still c9e1f3a5b7d2
+  PASS  config rows point at no deleted admin (updated_by cleared)
+  PASS  one audit row: production_data_reset, by the owner
+  PASS  foreign keys are intact (no orphan: every FK in the catalog still validated)
+  PASS  sessions and refresh tokens of the owner are gone (fresh sign-in required)
+
+== 4. SECOND REAL RUN: idempotent, changes nothing (not even a second audit row) ==
+NOTHING_TO_RESET: the database already holds only the kept rows. No change was made (no new audit row).
+  PASS  second run exits 0
+  PASS  second run says NOTHING_TO_RESET
+  PASS  second run does NOT claim RESET_COMMITTED / 'all other data is gone'
+  PASS  whole-database data dump identical before/after the second run
+  PASS  still exactly one audit row
+  PASS  a dry run after the real run also says NOTHING_TO_RESET
+  PASS    and does not print RESET_DRY_RUN_ROLLED_BACK
+
+== 4b. the owner can sign in and use the console on the wiped database (the app's own HTTP routes) ==
+  users before signup: 0 | sessions: 0 | refresh tokens: 0
+  PASS  health answers 200 {status: healthy}
+  PASS  owner password sign-in -> second factor required
+  second-factor methods offered: ['webauthn', 'totp', 'recovery_code']
+  PASS  the passkey and the authenticator app are offered (kinds survived)
+  PASS  authenticator code accepted -> signed in
+  PASS  GET /admin/me -> the owner
+  PASS    and the role is superadmin
+  PASS  admin dashboard loads (empty platform)
+  PASS  fee settings (kept config) readable in the console
+  PASS  analytics endpoint answers
+2026-11-20 13:15:29.045 | ERROR    | app.services.email:send_email_smtp:108 - Failed to send email: SMTPServerDisconnected
+  PASS  a brand-new user can sign up on the wiped database
+  PASS  exactly one user exists now (the new signup)
+  PASS  dashboard still loads with that user
+  PASS  a wrong owner password is still refused
+OWNER SIGN-IN CHECKS PASSED
+  PASS  owner sign-in script exit code
+
+== 5. GUARDS: each refusal exits non-zero and leaves every row where it was ==
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
+  PASS  owner admin missing from a database full of data: exit non-zero
+  PASS  owner admin missing from a database full of data: message mentions 'expected exactly 1 admin'
+  PASS  owner admin missing from a database full of data: no RESET_COMMITTED printed
+  PASS  owner admin missing from a database full of data: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 0
+  PASS  fresh schema without any admin: exit non-zero
+  PASS  fresh schema without any admin: message mentions 'expected exactly 1 admin'
+  PASS  fresh schema without any admin: no RESET_COMMITTED printed
+  PASS  fresh schema without any admin: data unchanged
+  PASS  probe row still there
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: connected to database "weysure_other", this reset is for "weysure"
+  PASS  database name is not weysure: exit non-zero
+  PASS  database name is not weysure: message mentions 'connected to database'
+  PASS  database name is not weysure: no RESET_COMMITTED printed
+  PASS  database name is not weysure: data unchanged
+  output: psql:/tmp/reset.sql:23: ERROR:  REFUSED: DRY_RUN must be exactly true or false
+  PASS  DRY_RUN=maybe: exit non-zero
+  PASS  DRY_RUN=maybe: message mentions 'DRY_RUN must be exactly true or false'
+  PASS  DRY_RUN=maybe: no RESET_COMMITTED printed
+  PASS  DRY_RUN=maybe: data unchanged
+  output: psql:/tmp/reset.sql:23: ERROR:  REFUSED: DRY_RUN must be exactly true or false
+  PASS  DRY_RUN empty: exit non-zero
+  PASS  DRY_RUN empty: message mentions 'DRY_RUN must be exactly true or false'
+  PASS  DRY_RUN empty: no RESET_COMMITTED printed
+  PASS  DRY_RUN empty: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin is "admin", not "superadmin"
+  PASS  owner admin: role: exit non-zero
+  PASS  owner admin: role: message mentions 'not "superadmin"'
+  PASS  owner admin: role: no RESET_COMMITTED printed
+  PASS  owner admin: role: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin is not active
+  PASS  owner admin: inactive: exit non-zero
+  PASS  owner admin: inactive: message mentions 'is not active'
+  PASS  owner admin: inactive: no RESET_COMMITTED printed
+  PASS  owner admin: inactive: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has not set a password yet (invite pending)
+  PASS  owner admin: password pending: exit non-zero
+  PASS  owner admin: password pending: message mentions 'not set a password'
+  PASS  owner admin: password pending: no RESET_COMMITTED printed
+  PASS  owner admin: password pending: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has no confirmed second factor; enrol one in the console firs
+  PASS  owner admin: no factor: exit non-zero
+  PASS  owner admin: no factor: message mentions 'no confirmed second factor'
+  PASS  owner admin: no factor: no RESET_COMMITTED printed
+  PASS  owner admin: no factor: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: the owner admin has no unused recovery code. After the reset nobody else could rescue the account; generate new recovery codes i
+  PASS  owner admin: no unused recovery code: exit non-zero
+  PASS  owner admin: no unused recovery code: message mentions 'no unused recovery code'
+  PASS  owner admin: no unused recovery code: no RESET_COMMITTED printed
+  PASS  owner admin: no unused recovery code: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: expected exactly 1 admin with email beyrichq@gmail.com, found 2
+  PASS  owner admin: two admins with the owner email: exit non-zero
+  PASS  owner admin: two admins with the owner email: message mentions 'found 2'
+  PASS  owner admin: two admins with the owner email: no RESET_COMMITTED printed
+  PASS  owner admin: two admins with the owner email: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: tables not classified in this script: brand_new_feature
+  PASS  an unclassified table exists (future migration): exit non-zero
+  PASS  an unclassified table exists (future migration): message mentions 'not classified'
+  PASS  an unclassified table exists (future migration): no RESET_COMMITTED printed
+  PASS  an unclassified table exists (future migration): data unchanged
+  output: psql:/tmp/reset.sql:243: ERROR:  cannot truncate a table referenced in a foreign key constrain
+  PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): exit non-zero
+  PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): message mentions 'cannot truncate a table referenced in a foreign key'
+  PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): no RESET_COMMITTED printed
+  PASS  a kept table references a wiped table (no CASCADE: Postgres refuses): data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: database user "weysure_owner" lacks the privilege this reset needs on: users
+  PASS  the database user lacks TRUNCATE on a table: exit non-zero
+  PASS  the database user lacks TRUNCATE on a table: message mentions 'lacks the privilege'
+  PASS  the database user lacks TRUNCATE on a table: no RESET_COMMITTED printed
+  PASS  the database user lacks TRUNCATE on a table: data unchanged
+  output: psql:/tmp/reset.sql:201: ERROR:  REFUSED: database user "v_app_local" lacks the privilege this reset needs on: account_freezes, admin_notification_states, admin_notifica
+  PASS  run as weysure_app (DML only: the guard refuses before any change): exit non-zero
+  PASS  run as weysure_app (DML only: the guard refuses before any change): message mentions 'lacks the privilege'
+  PASS  run as weysure_app (DML only: the guard refuses before any change): no RESET_COMMITTED printed
+  PASS  run as weysure_app (DML only: the guard refuses before any change): data unchanged
+  PASS  stale reset record by another admin: real run exits 0
+  PASS    and leaves 1 admin and exactly the new audit row by the owner
+  PASS  one factor + unused recovery code: dry run exits 0
+  PASS    and prints the single-factor WARNING
+  PASS    and reports the unused recovery codes it found
+
+== 6. what the reset leaves behind works: the app's own write paths on the wiped database ==
+  PASS  a job can be inserted again (jobs table usable, dedupe index intact)
+  sequences in use before the reset: 3
+  PASS  RESTART IDENTITY: sequences were rese
+
+== RESULT ==
+ALL CHECKS PASSED
+
+################ Part 2: gates ################
+== 1. the age helpers fail closed
+  (the old gate: an empty age is treated as 0, so  [[ "" -ge 6 ]]  is false and the gate PASSES: passed)
+  PASS  age_ok: empty -> fail
+  PASS  age_ok: garbage -> fail
+  PASS  age_ok: naive (no timezone) -> fail
+  PASS  age_ok: future -> fail
+  PASS  age_ok: too old -> fail
+  PASS  age_ok: max not a number -> fail
+  PASS  age_ok: fresh -> pass
+  PASS  age_hours prints nothing for garbage (not 0)
+== 2. the gates of the real script, with stubs
+  PASS  all gates satisfied: reaches the server dry run, exit 0
+  PASS  snapshot: none -> FAIL 1
+  PASS  snapshot: 'None' -> FAIL 1
+  PASS  snapshot: id without a time -> FAIL 1 (was a silent pass)
+  PASS  snapshot: unreadable time -> FAIL 1 (was a silent pass)
+  PASS  snapshot: 7 h old -> FAIL 1
+  PASS  backup: no timestamp, no override -> FAIL 2 (was a silent pass)
+  PASS  backup: unreadable time -> FAIL 2
+  PASS  backup: 30 h old -> FAIL 2
+  PASS  backup: manual dump stated -> passes
+  PASS  dry run: no completion time -> FAIL 3 (was a silent pass)
+  PASS  dry run: not succeeded -> FAIL 3
+  PASS  dry run: 30 h old -> FAIL 3
+  PASS  dry run of a DIFFERENT manifest hash -> FAIL 3
+  PASS  dry run: kubectl returns nothing -> FAIL 3
+  PASS  api-worker at 1 replica -> refused (real)
+  PASS  api-worker at 1 replica -> refused (dry)
+  PASS  api-worker replicas unreadable -> refused
+== 3. the gitops checkout must be clean, on main and equal to origin/main
+  PASS  modified manifest -> refused
+  PASS  untracked file -> refused
+  PASS  local HEAD behind origin/main (after fetch) -> refused
+  PASS  after pulling, the earlier dry run belongs to the OLD manifest -> FAIL 3
+  PASS  a dry run of the new manifest -> passes
+  PASS  not on main -> refused
+== 4. rendering (PRINT=1 runs no checks)
+  PASS  name is db-reset-prod-v1-real-<time>
+  PASS  DRY_RUN is false for real
+  PASS  manifest sha annotation is the file's sha256
+  PASS  mode label on the Job and the pod
+  PASS  dry render keeps DRY_RUN true
+ALL GATE CASES PASSED
