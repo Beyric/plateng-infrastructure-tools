@@ -345,6 +345,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [ ] Separate: us-east-1b /28 prefix space (`InsufficientCidrBlocks`)
 - ⏸ Staging namespace `weysure-stage` — asked for by the developers, **left for now** (Adebayo, 2026-10-02)
 - [x] Cost: EKS control-plane logs off (−$51/mo); EKS add-on versions pinned *(infra #41, applied 2026-09-29)*
+- [ ] **Cost trims, measured 2026-11-20** ([SOP](../sop/2026-11-20-aws-cost-trims.md); worth about $1.5–3 / month together, nothing applied)
+  - [x] S3 gateway endpoint: **already live since 2026-08-31**, nothing to add; ECR interface endpoints would cost more than they save
+  - [ ] ECR prune: `scripts/ecr-prune.sh` dry run proved ~1,213 images deletable with every deployed and rollback tag kept; `--apply` is Adebayo's
+  - [ ] RDS log groups: 30-day retention + import of `weysure-postgres-v2/postgresql` (plan: 1 import, 1 add, 1 change, 0 destroy), then Adebayo's apply
+  - [ ] Delete the empty-instance log group `/aws/rds/instance/weysure-postgres/postgresql` (Adebayo, one command)
+  - [x] EKS cluster log group left at 90 days on purpose (30 would delete the only 2026-09 audit history to save ~$0.2); empties itself 2026-12-28
+  - [ ] **Decision for Adebayo:** EKS `audit` + `authenticator` logging is off while live — re-enable before more real users (`main.tf` comment says before go-live)
 - [x] Verifier has both replicas: Jenkins CPU request 500m → 150m from measurements *(gitops #53, 2026-09-29)*
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays). **Reversed 2026-10-13 for api/web (ADR-024).**
 - [x] 10 · SOP [2026-09-29-phase-10-hardening-dr](../sop/2026-09-29-phase-10-hardening-dr.md) · overview · checklist *(2026-09-30; wake + verifier attach stay open above)* · ADR-023 scope freeze

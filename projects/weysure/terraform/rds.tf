@@ -83,7 +83,15 @@ module "rds" {
   # Ships Postgres logs to CloudWatch; the upgrade log is what you read when a
   # maintenance window breaks something.
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
-  performance_insights_enabled    = true
+
+  # Without this the module leaves the log groups to AWS, which creates them
+  # with "never expire". Owning them here pins 30 days (2026-11-20 cost review).
+  # The postgresql group already exists, so rds-log-groups.tf imports it; the
+  # upgrade group is created empty.
+  create_cloudwatch_log_group            = true
+  cloudwatch_log_group_retention_in_days = 30
+
+  performance_insights_enabled = true
 
   parameters = [
     # Force TLS. Vault and the app connect with sslmode=require, but this makes
