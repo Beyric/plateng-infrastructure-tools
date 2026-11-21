@@ -1,7 +1,7 @@
 # SOP — production data reset (`db-reset-prod-v1`): keep only the owner's admin account
 
-**Status:** built and proven locally, **not run on production**. Prepared 2026-11-20; the owner runs it, after the
-RDS snapshot and an off-AWS backup exist ([runbook](../runbooks/PROD_DATA_RESET.md)).
+**Status:** **RUN ON PRODUCTION 2026-11-20** (real run ~22:26 WAT, Job `db-reset-prod-v1-real-20261120212616`, committed). Built and proven locally first; the owner ran it after the
+RDS snapshot and an off-AWS backup existed ([runbook](../runbooks/PROD_DATA_RESET.md)).
 **Shipped as:** [plateng-gitops #110](https://github.com/Beyric/plateng-gitops/pull/110) `chore/prod-data-reset` (head `ed055001b12c`, the Job, outside every Argo path) and this repo's `docs/prod-data-reset` (script, runbook, harness, this SOP, evidence).
 **Kind:** destructive one-off data tooling, no migration, no app change · **Cost delta:** $0 (a pre-reset RDS snapshot costs a few cents a month until deleted).
 
@@ -104,9 +104,23 @@ Run order, expected output and after-checks: [runbook](../runbooks/PROD_DATA_RES
 [2026-10-08 recovery SOP](2026-10-08-database-recovery.md) or the off-AWS dump per [DB_OFFSITE_BACKUP.md](../runbooks/DB_OFFSITE_BACKUP.md); anything written after the reset is lost with it. A *failed* run commits nothing.
 Retire the Job by deleting `projects/weysure/manual/prod/` in gitops once the reset has happened and the 30-day snapshot is deleted.
 
+## What happened on the day (2026-11-20)
+
+| Step | Result |
+|---|---|
+| Dry run 1 (21:11 UTC) | **Failed, nothing changed.** `syntax error at or near "$"` at `/tmp/reset.sql:218`. Cause: Kubernetes turns a double dollar sign in container `command`/`args` into a single one, so the three `DO $$ BEGIN … END $$;` blocks reached psql as `DO $ BEGIN`. The local proof ran the SQL outside Kubernetes and could not see it. Fixed in gitops [#111](https://github.com/Beyric/plateng-gitops/pull/111) (named tag `$do$`, comment added) |
+| First attempt also tripped the worker gate | Argo auto-synced `weysure-api` after the #110 merge and put `api-worker` back to 1 replica (`selfHeal` is off, but a new git revision still syncs). Lesson: do not merge to gitops between scaling the worker down and the real run, and scale down and run in one command |
+| Dry run 2 (manifest sha `71baa6c4a1fc`) | OK, rolled back. Table read by the owner |
+| Real run | `RESET_COMMITTED`. Kept: owner admin (superadmin, active), 3 second factors (passkey + 2 authenticator apps), 10 recovery codes, 6 config tables unchanged, 1 audit row (the reset itself). Wiped: 62 tables, 522 rows (5 users, 391 refresh tokens, 14 sessions, 23 jobs …) |
+| After-checks | worker scaled 0 to 1, startup sweeps re-created the recurring jobs (reconciliation, DVA reconcile, auto-pause, retention, mfa recovery sweep, auth session prune …); api 2/2, web 2/2, `https://api.weysure.com/api/v1/health` 200, no errors in API logs |
+
+**Rule for any future Job:** never put a bare double dollar sign in a Kubernetes `command` or `args` block. Use named dollar-quote tags (`$do$`, `$guard$`) or ship the SQL in a ConfigMap.
+
 ## Follow-ups
 
-- Owner answers Q1–Q4 above before the real run, and enrols a second factor and saves recovery codes first.
+- [x] Owner answered Q1–Q4 (keep settings, only his admin, no audit export) and had factors + recovery codes (the guard enforced it).
+- [ ] Owner signs in once to the admin console after the reset (every session was wiped).
+- [ ] Add a repo check that fails on a bare double dollar sign inside Kubernetes `command`/`args` (it passed every local proof and failed on the cluster).
 - Delete the pre-reset RDS snapshot and Drive dump after 30 days (they hold testers' personal data).
 - Clean the Cloudinary `weysure/` folders (runbook).
 - If a migration adds a table before the reset runs, add it to the `reset_class` block (the Job refuses until then) and re-run `prove-local.sh`.

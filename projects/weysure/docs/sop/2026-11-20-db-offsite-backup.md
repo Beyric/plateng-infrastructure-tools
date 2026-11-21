@@ -49,7 +49,8 @@ Success line: `BACKUP_OK object=daily/… bytes=… sha256=… md5=… daily_kep
 |---|---|
 | Role Job, restore, retention, failure cases, alert logic | **proven locally**: see the runbook table and the evidence log (restore into a second fresh Postgres 16: 16/16 checks identical, 80,301 rows) |
 | Repo checks | pre-commit all pass; kubeconform strict 0 invalid; Kyverno CLI v1.19.1: 18 pass / 0 fail; promtool: OK |
-| **Not exercised** | real Google Drive upload; role Job on real RDS; live admission, ESO sync, Argo order; Slack delivery. First live run (runbook step E) is the test |
+| **Live, 2026-11-20** | merged (gitops #108 `8195419f`, tools #115 `21c467bf`); Argo synced; role Job on real RDS Complete (72 tables + 5 sequences readable, no elevated attributes, login ok, read-only); ESO `SecretSynced`; first manual run `BACKUP_OK object=daily/weysure-2026-11-20T204215Z.dump.age bytes=293501`, monthly keeper stored, size + MD5 verified on Drive; **restore from Drive with the owner private key into a fresh Postgres 16: 72 tables, 5 users, `alembic_version` `c9e1f3a5b7d2`** |
+| **Not exercised** | Slack delivery of `WeysureDbBackupMissing`; a scheduled (not manual) 02:30 UTC run |
 
 ## Operate / roll back
 
@@ -58,7 +59,8 @@ Success line: `BACKUP_OK object=daily/… bytes=… sha256=… md5=… daily_kep
 
 ## Follow-ups
 
-- [ ] Owner steps: key pair, Google OAuth client + `rclone config`, `vault kv put`, merge, first manual run, first restore test.
+- [x] Owner steps, merge, first manual run and first restore test: done 2026-11-20.
+- [ ] See the 02:30 UTC scheduled run succeed on its own (`kubectl -n weysure-prod get cronjob weysure-db-backup`, `lastSuccessfulTime`).
 - [ ] **Database only.** Add an encrypted export of Vault `secret/weysure/*` (the S3 Vault snapshot is AWS-KMS-encrypted, unreadable elsewhere) and note Cloudinary uploads, for a complete exit.
 - [ ] Build a small image (postgres client + age + rclone) in ECR to drop the runtime age download.
 - [ ] Name-based egress allowlist (egress proxy or FQDN-aware CNI) for this pod.

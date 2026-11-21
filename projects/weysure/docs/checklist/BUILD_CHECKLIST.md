@@ -242,12 +242,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
   - [x] `drill-rds-restore.sh` — comparison tested on local Postgres 16 (5 cases); Job accepted by the API server and Kyverno (dry run)
   - [x] **Vault drill run on the production snapshot: PASS, 41 s** *(2026-09-29)*
   - [x] **RDS drill run: PASS, RPO 261 s, RTO 13 min** *(2026-09-29)*
-- [ ] 5b · Nightly encrypted off-AWS database backup to Google Drive *(gitops [#108](https://github.com/Beyric/plateng-gitops/pull/108), 2026-11-20; [runbook](../runbooks/DB_OFFSITE_BACKUP.md), [SOP](../sop/2026-11-20-db-offsite-backup.md))*
-  - [x] CronJob + read-only role Job + ExternalSecret + NetworkPolicy + `WeysureDbBackupMissing`; PR open, not merged
+- [x] 5b · Nightly encrypted off-AWS database backup to Google Drive *(gitops [#108](https://github.com/Beyric/plateng-gitops/pull/108), 2026-11-20; [runbook](../runbooks/DB_OFFSITE_BACKUP.md), [SOP](../sop/2026-11-20-db-offsite-backup.md))*
+  - [x] CronJob + read-only role Job + ExternalSecret + NetworkPolicy + `WeysureDbBackupMissing`; merged 2026-11-20 (gitops #108 `8195419f`, tools #115 `21c467bf`), synced by Argo, role Job Complete (72 tables, 5 sequences readable, read-only, login ok)
   - [x] Proven locally: role, `pg_dump | age`, restore into a fresh Postgres 16 (16/16 identical), retention, failure cases, alert (promtool)
-  - [ ] Owner steps: age key pair, Google OAuth client + `rclone config`, `vault kv put secret/weysure/backup`
-  - [ ] Merged and live; first manual run `BACKUP_OK`; file visible in Drive
-  - [ ] First real restore test from Drive with the private key
+  - [x] Owner steps done 2026-11-20: age key pair, Google OAuth client + `rclone config` (local remote `gdrive_w`), `vault kv put secret/weysure/backup` (5 keys)
+  - [x] Merged and live; first manual run `BACKUP_OK` 2026-11-20 20:42 UTC (293,501 bytes, `daily/` + monthly keeper, size and MD5 verified on Drive)
+  - [x] First real restore test from Drive with the private key 2026-11-20 ~21:53 WAT: 72 tables, 5 users, `alembic_version` `c9e1f3a5b7d2`. Repeat quarterly
+  - [ ] Confirm `WeysureDbBackupMissing` reaches Slack (never seen firing); next scheduled run 02:30 UTC (03:30 WAT) to be seen succeeding on its own
 - [x] 6 · Cloudflare Access apps + GitHub webhook bypass scoped to `/github-webhook/` *(console, 2026-09-27)*
 - [x] 7 · forward-auth: verifier built *(gitops #52)*; **SonarQube attached 2026-10-02** *(gitops #56)*: direct-to-NLB 200 → 401, in-cluster Jenkins path unaffected
   - [x] real Access token accepted *(156 requests 200/304 with real tokens, 2026-10-02)*
@@ -344,12 +345,13 @@ apply`, no cluster mutation, and no production deploy without explicit approval.
 - **Scope decision 2026-09-29:** stop building after drills, sleep rehearsal and attaching the verifier to Sonar. Tasks 8 (Vault in Terraform) and the Prometheus/Alertmanager/Argo CD Ingresses of task 7 move to *Deferred follow-ups*. api/web replicas may share a spot node (`ScheduleAnyway` stays). **Reversed 2026-10-13 for api/web (ADR-024).**
 - [x] 10 · SOP [2026-09-29-phase-10-hardening-dr](../sop/2026-09-29-phase-10-hardening-dr.md) · overview · checklist *(2026-09-30; wake + verifier attach stay open above)* · ADR-023 scope freeze
 
-- [ ] **Production data reset before live keys** (keep only the owner's admin `beyrichq@gmail.com`; 2026-11-20) *([runbook](../runbooks/PROD_DATA_RESET.md), [SOP](../sop/2026-11-20-prod-data-reset.md), [evidence](../evidence/2026-11-20-prod-data-reset-proof.txt); gitops [#110](https://github.com/Beyric/plateng-gitops/pull/110))*
+- [x] **Production data reset before live keys** *(COMMITTED 2026-11-20 ~22:26 WAT, Job `db-reset-prod-v1-real-20261120212616`)* (keep only the owner's admin `beyrichq@gmail.com`; 2026-11-20) *([runbook](../runbooks/PROD_DATA_RESET.md), [SOP](../sop/2026-11-20-prod-data-reset.md), [evidence](../evidence/2026-11-20-prod-data-reset-proof.txt); gitops [#110](https://github.com/Beyric/plateng-gitops/pull/110), fix [#111](https://github.com/Beyric/plateng-gitops/pull/111))*
   - [x] 72 tables classified (6 keep, 3 owner, 1 audit, 62 wipe); guarded one-transaction SQL, `DRY_RUN` default, idempotent; gitops Job **outside Argo's synced path** + `scripts/db-reset-prod.sh` gate (fail-closed: clean gitops at origin/main, worker at 0, snapshot, off-AWS backup, dry run of the same manifest hash, type `RESET`; 37 gate cases in `test-gates.sh`)
   - [x] Proven locally on postgres:16 against the real schema (head `c9e1f3a5b7d2`): 107 checks: dry run, real run, second run no-op, 15 guard refusals (incl. no unused recovery code), owner password + TOTP sign-in on the wiped database, new signup; Kyverno CLI 9/9, kubeconform valid
-  - [ ] Owner answers the SOP questions (test-edited settings kept? other admins? old audit logs? any real partner?); second factor + saved recovery codes first
-  - [ ] RDS snapshot `available` + first off-AWS backup (`BACKUP_OK`)
-  - [ ] Dry run read by the owner, real run committed, `api-worker` scaled to 0 for the window and back to 1, after-checks done
+  - [x] Owner answers 2026-11-20: keep settings as they are, keep only `beyrichq@gmail.com`, no audit-log export; second factors (passkey + 2 authenticators) and unused recovery codes present (guard passed)
+  - [x] RDS snapshot `available` (`weysure-pre-reset-20261120-…`) + first off-AWS backup (`BACKUP_OK`)
+  - [x] Dry run read by the owner (522 rows in 62 wipe tables to 0; admins 2 to 1; mfa_factors 4 to 3; recovery codes 20 to 10; 6 keep tables unchanged), real run committed, worker 0 then 1, worker startup re-created its recurring jobs, api/web healthy, api logs clean
+  - [ ] Owner signs in once to the admin console (all sessions were wiped) and confirms
   - [ ] Cloudinary `weysure/` test uploads deleted; pre-reset snapshot and Drive dump deleted after 30 days
 - [ ] Full DR drill: rebuild from Terraform + restore data, timed
 - [ ] SLOs and error budgets defined
