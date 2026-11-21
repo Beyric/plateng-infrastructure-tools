@@ -1,0 +1,166 @@
+# Weysure on ONE plain VPS: Caddy (TLS) -> web + api, worker, Postgres 16, Redis.
+# Companion to ../VPS_MIGRATION.md. Copy this folder to /opt/weysure on the server.
+#
+# Start from Weysure-API/docker-compose.yaml (the developers' local file) and what it lacks for
+# production is added here: Postgres, the web app, TLS, no published db/redis ports, read-only
+# containers, no source bind-mounts, a pinned network so the client-IP rule works, limits.
+#
+# Needed in /opt/weysure/.env (names in env.example): POSTGRES_PASSWORD, API_IMAGE, WEB_IMAGE,
+# WEB_DOMAIN, API_DOMAIN, ACME_EMAIL, plus every application setting the API and worker read.
+name: weysure
+
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+x-api-base: &api-base
+  <<: *hardening
+  image: ${API_IMAGE:?set API_IMAGE in .env}
+  env_file: [.env]
+  restart: unless-stopped
+  stop_grace_period: 60s
+  read_only: true
+  tmpfs: ["/tmp"]
+  logging: *default-logging
+  # edge = reachable by Caddy and allowed to call out (Paystack, SMTP, ...); backend = the private network with db and redis.
+  networks: [edge, backend]
+  environment: &api-env
+    # The API reads one database URL; the password comes from .env, never from a file in git.
+    DATABASE_URL: postgresql://${POSTGRES_USER:-weysure}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-weysure}
+    REDIS_URL: redis://redis:6379/0
+    # Only Caddy (fixed address below) may vouch for the client address; see Caddyfile.
+    TRUSTED_PROXY_CIDRS: "172.28.0.10/32"
+    WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+
+services:
+  caddy:
+    <<: *hardening
+    image: caddy:2.11.8-alpine@sha256:f6228111e5fafa1a5238258d0858e103f10599b8d1659a146e7726681a002bb9
+    restart: unless-stopped
+    cap_add: [NET_BIND_SERVICE]
+    # IPv4 only, on purpose: through Docker's IPv6 proxy every client would look like the bridge gateway, and the
+    # API's per-client rate limits and audit addresses would collapse into one. Create A records, NO AAAA records.
+    ports: ["0.0.0.0:80:80", "0.0.0.0:443:443", "0.0.0.0:443:443/udp"]
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:?set WEB_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data         # certificates: keep this volume or Let's Encrypt is asked again
+      - caddy_config:/config
+    depends_on: [api, web]
+    logging: *default-logging
+    networks:
+      edge: { ipv4_address: 172.28.0.10 }
+
+  api:
+    <<: *api-base
+    # Migrations run at boot (boot/docker-run.sh, RUN_MIGRATIONS defaults to true). One api container only.
+    expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    <<: *api-base
+    command: ["python", "-m", "app.worker"]
+    environment:
+      <<: *api-env
+      # The wallet reconciliation loop lives in the worker (as in the cluster).
+      WALLET_RECONCILIATION_SCHEDULER_ENABLED: "true"
+      WALLET_RECONCILIATION_INTERVAL_MINUTES: "30"
+      WALLET_RECONCILIATION_NOTIFY_COOLDOWN_MINUTES: "60"
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/worker-heartbeat) )) -lt 45"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    <<: *hardening
+    # The image has the API address baked in at BUILD time (NEXT_PUBLIC_API_URL / _WS_URL).
+    # Same domains as today: the ECR image works as it is. New domains: rebuild (VPS_MIGRATION.md).
+    image: ${WEB_IMAGE:?set WEB_IMAGE in .env}
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    environment: { NODE_ENV: production, NEXT_TELEMETRY_DISABLED: "1", PORT: "3000", HOSTNAME: 0.0.0.0 }
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: ${WEB_MEM_LIMIT:-512m}
+    logging: *default-logging
+    networks: [edge]        # no route to db or redis
+
+  db:
+    <<: *hardening
+    image: postgres:16.16-alpine3.23@sha256:a23cda8ed4733a74cd0a328fcb525a43c35cdbaa845b6fdb8f343646f995cc1e
+    container_name: weysure_db            # backup.sh and the runbook address it by this name
+    restart: unless-stopped
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]   # the official entrypoint needs these to own the data dir
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-weysure}
+      POSTGRES_DB: ${POSTGRES_DB:-weysure}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    # No ports: only the other containers reach it. Never publish 5432.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: ${DB_MEM_LIMIT:-1g}
+    shm_size: 256m
+    logging: *default-logging
+    networks: [backend]     # only api and worker can reach it; it cannot reach out
+
+  redis:
+    <<: *hardening
+    image: redis:7.4.11-alpine@sha256:d9436322172a5b482c187bf1f363d3c4fea086fcca6b9c8a94de8f0f39ed3193
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save ""   # disposable: rate-limit counters, pub/sub and short-lived retry counters (all expire)
+    read_only: true
+    tmpfs: ["/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 192m
+    logging: *default-logging
+    networks: [backend]     # only api and worker can reach it; it cannot reach out
+
+networks:
+  edge:
+    ipam:
+      config: [{ subnet: 172.28.0.0/24 }]
+  backend:
+    internal: true          # no route to the internet and none from it; db and redis live only here
+    ipam:
+      config: [{ subnet: 172.28.1.0/24 }]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
